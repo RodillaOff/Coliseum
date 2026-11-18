@@ -1,0 +1,7 @@
+﻿configmap/coliseum-config configured
+persistentvolumeclaim/coliseum-db-datos created
+deployment.apps/coliseum-db created
+service/coliseum-db created
+deployment.apps/coliseum-app created
+service/coliseum-app created
+

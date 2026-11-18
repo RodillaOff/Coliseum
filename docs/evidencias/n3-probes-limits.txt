@@ -1,0 +1,29 @@
+﻿Name:                   coliseum-app
+    Image:      ghcr.io/rodillaoff/coliseum:latest
+    Limits:
+      cpu:     500m
+      memory:  384Mi
+    Requests:
+      cpu:      100m
+      memory:   192Mi
+    Liveness:   http-get http://:8080/health delay=45s timeout=5s period=20s #success=1 #failure=6
+    Readiness:  http-get http://:8080/health delay=15s timeout=5s period=10s #success=1 #failure=3
+    Environment Variables from:
+      coliseum-config  ConfigMap  Optional: false
+      coliseum-secret  Secret     Optional: false
+Name:               coliseum-db
+    Image:      postgres:16-alpine
+    Limits:
+      cpu:     500m
+      memory:  512Mi
+    Requests:
+      cpu:      100m
+      memory:   256Mi
+    Liveness:   exec [sh -c pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"] delay=60s timeout=5s period=20s #success=1 #failure=6
+    Readiness:  exec [sh -c psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'SELECT 1' > /dev/null] delay=10s timeout=5s period=10s #success=1 #failure=3
+      POSTGRES_USER:      <set to the key 'DB_USER' in secret 'coliseum-secret'>      Optional: false
+      POSTGRES_PASSWORD:  <set to the key 'DB_PASSWORD' in secret 'coliseum-secret'>  Optional: false
+      POSTGRES_DB:        <set to the key 'DB_NAME' of config map 'coliseum-config'>  Optional: false
+    ClaimName:  coliseum-db-datos
+    Name:          coliseum-sql
+

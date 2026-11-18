@@ -166,6 +166,8 @@ Qué hay en los manifiestos:
 
 📸 **Captura 4:** `kubectl get pods,svc` con todo en Running y `/health` respondiendo OK.
 
+> Evidencia real (ejecutada con `scripts/captura4-kubernetes.bat`): [`docs/evidencias/captura4-resumen.md`](evidencias/captura4-resumen.md), `n3-get-pods-svc.txt` (pods `Running 1/1`) y `n3-health-en-cluster.txt` (`/health` OK).
+
 ## Solución de problemas
 
 | Síntoma | Causa y solución |

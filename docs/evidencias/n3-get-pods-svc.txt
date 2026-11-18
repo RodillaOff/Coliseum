@@ -1,0 +1,9 @@
+﻿NAME                                READY   STATUS    RESTARTS   AGE
+pod/coliseum-app-84b45c68cc-9s7bp   1/1     Running   0          91s
+pod/coliseum-db-55b66cff6f-wzww4    1/1     Running   0          92s
+
+NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/coliseum-app   NodePort    10.105.160.54   <none>        8080:30080/TCP   91s
+service/coliseum-db    ClusterIP   10.96.88.187    <none>        5432/TCP         92s
+service/kubernetes     ClusterIP   10.96.0.1       <none>        443/TCP          14h
+

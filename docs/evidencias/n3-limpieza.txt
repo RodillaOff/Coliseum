@@ -1,0 +1,6 @@
+﻿deployment.apps "coliseum-app" deleted from default namespace
+deployment.apps "coliseum-db" deleted from default namespace
+service "coliseum-app" deleted from default namespace
+service "coliseum-db" deleted from default namespace
+persistentvolumeclaim "coliseum-db-datos" deleted from default namespace
+

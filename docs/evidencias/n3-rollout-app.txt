@@ -1,0 +1,3 @@
+﻿Waiting for deployment "coliseum-app" rollout to finish: 0 of 1 updated replicas are available...
+deployment "coliseum-app" successfully rolled out
+
