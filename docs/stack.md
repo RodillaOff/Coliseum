@@ -1,40 +1,37 @@
-# Stack Tecnológico
+# Stack tecnológico
 
-- **Lenguaje de Programación**
-  - Java (JDK 11+)
-  - Lenguaje principal de desarrollo orientado a objetos
+Proyecto **de escritorio** (Programación Avanzada, UTU). Todo el stack usa servicios gratuitos y no requiere tarjeta de crédito.
 
-- **Interfaz Gráfica (GUI)**
-  - Java Swing & AWT
-  - Implementación de vistas (`JFrame`, `JDialog`, `JPanel`, `JButton`, `CardLayout`, `GridBagLayout`, `BoxLayout`)
+## Aplicación
 
-- **Base de Datos**
-  - MySQL 8.0+
-  - Motor de base de datos relacional para la persistencia
-  - MySQL Workbench para crear la base y consultar las tablas
+- **Lenguaje:** Java 11 o superior (probado con 17 y 21). Programación orientada a objetos.
+- **Interfaz gráfica:** Java Swing y AWT (`JFrame`, `JDialog`, `JPanel`, `CardLayout`, `GridBagLayout`).
+- **Modo sin ventana (servicio/consola):** `consola.ConsolaMain` con `com.sun.net.httpserver.HttpServer` para `GET /health`. Es lo que corre dentro de Docker y Kubernetes.
+- **Fechas y horas:** Java Time API (`LocalDate`, `LocalTime`, `YearMonth`, `DayOfWeek`).
+- **Notificaciones y segundo plano:** toast de Windows con PowerShell, `SystemTray`/`TrayIcon`, `ScheduledExecutorService` (revisión cada 30 s), `ServerSocket` + `FileLock` (instancia única).
 
-- **Conector JDBC**
-  - MySQL Connector/J (`com.mysql.cj.jdbc.Driver`)
-  - Controlador oficial para la comunicación Java-MySQL
+## Datos
 
-- **Seguridad / Cryptography**
-  - `java.security.MessageDigest`
-  - Generación de hashes SHA-256 para contraseñas
-  - `PreparedStatement` para prevenir inyección SQL
+- **Base de datos:** MySQL 8 (contenedor `mysql:8.0` en local; servicio MySQL gratuito de **Aiven** en la nube).
+- **Acceso:** JDBC con **MySQL Connector/J** (`lib/mysql-connector-j-26.7.0.jar`). Todas las consultas usan `PreparedStatement` (R9).
+- **Esquema y datos:** `sql/01-crear-tablas.sql` y `sql/02-datos-prueba.sql` (R11). La aplicación **no** crea ni altera tablas.
 
-- **Manejo de Fechas**
-  - Java Time API (`LocalDate`, `LocalTime`, `LocalDateTime`, `DayOfWeek`, `YearMonth`)
-  - Gestión estructurada de fechas, horas y rutinas del calendario
+## Seguridad
 
-- **Notificaciones**
-  - Notificaciones de Windows (toast) mostradas con PowerShell, con el nombre y el logo de Coliseum
-  - `java.awt.SystemTray` y `TrayIcon` como icono en la bandeja y aviso de respaldo
+- **Contraseñas:** PBKDF2-HMAC-SHA256 con sal aleatoria y 120.000 iteraciones (`seguridad/Pbkdf2Hash`). `Sha256Hash` queda solo para verificar cuentas antiguas, que se migran al iniciar sesión.
+- **Roles:** `ADMIN` y `USUARIO` (`modelo/Rol`), comprobados en la capa de servicio.
+- **Credenciales:** variables de entorno / archivo `.env` fuera de Git (R10).
+- **Transporte:** SSL (`DB_SSL_MODE=REQUIRED`) contra Aiven.
+- **Análisis (SSDLC):** SCA con Dependabot y Trivy, SAST con SonarLint, escaneo de imagen con Trivy (ver `informe-seguridad.md`).
 
-- **Segundo plano**
-  - `ScheduledExecutorService` para revisar los entrenos cada 30 segundos
-  - `ServerSocket` local y `FileLock` para permitir una sola copia de la aplicación
+## Contenedores y nube
 
-- **Configuración y registros**
-  - `java.util.Properties` para leer `coliseum.properties`
-  - `recordatorios.log` para guardar avisos y errores
-  - `logo.png` como imagen de la aplicación
+- **Docker:** `Dockerfile` en dos etapas (JDK para compilar, JRE para ejecutar, usuario no root UID 10001).
+- **docker compose:** `docker-compose.yml` con la app y MySQL; levanta todo con `docker compose up`.
+- **Registro de imágenes:** GitHub Container Registry (`ghcr.io`), publicada con GitHub Actions (`.github/workflows/docker-publish.yml`).
+- **Nube:** Aiven (MySQL). Render no aplica porque el proyecto es de escritorio.
+- **Orquestación:** Kubernetes local con minikube (o kind): `Deployment`, `Service`, `ConfigMap`, `Secret`, `PersistentVolumeClaim`, `requests/limits`, `readinessProbe` y `livenessProbe` (`k8s/`).
+
+## Herramientas de desarrollo
+
+Git y GitHub, IntelliJ IDEA / VS Code, SonarLint, MySQL Workbench o cliente `mysql` para los SELECT de comprobación, Mermaid para los diagramas.

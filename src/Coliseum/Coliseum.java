@@ -50,6 +50,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.swing.*;
+import excepciones.ColiseumException;
+import modelo.RutinaSemanal;
+import modelo.Usuario;
+import servicio.RutinaServicio;
+import servicio.UsuarioServicio;
 
 /**
  * COLISEUM
@@ -83,12 +88,28 @@ public class Coliseum extends JFrame {
         CronometroPanel cronometroPanel = new CronometroPanel();
         notificacionesPanel = new NotificacionesPanel(usuarioActual);
 
+        // Roles (R3): el administrador ve además la sección de administración de usuarios.
+        Usuario sesion = ConexionBD.obtenerUsuario(usuarioActual);
+        boolean esAdmin = sesion != null && sesion.puedeAdministrar();
+        ReportesPanel reportesPanel = sesion == null ? null : new ReportesPanel(sesion);
+        AdminPanel adminPanel = esAdmin ? new AdminPanel(sesion) : null;
+        CuentaPanel cuentaPanel = new CuentaPanel(usuarioActual);
+        EstadoPanel estadoPanel = new EstadoPanel();
+
         JPanel contenido = new JPanel(new CardLayout());
         contenido.add(inicioPanel, "inicio");
         contenido.add(calendarioPanel, "calendario");
         contenido.add(relojPanel, "reloj");
         contenido.add(cronometroPanel, "cronometro");
         contenido.add(notificacionesPanel, "notificaciones");
+        if (reportesPanel != null) {
+            contenido.add(reportesPanel, "reportes");
+        }
+        if (adminPanel != null) {
+            contenido.add(adminPanel, "admin");
+        }
+        contenido.add(cuentaPanel, "cuenta");
+        contenido.add(estadoPanel, "estado");
         CardLayout cardLayout = (CardLayout) contenido.getLayout();
 
         JPanel sidebar = new JPanel();
@@ -118,7 +139,45 @@ public class Coliseum extends JFrame {
         BotonNav btnReloj = new BotonNav("🕐   Reloj");
         BotonNav btnCronometro = new BotonNav("⏱   Cronómetro");
         BotonNav btnNotificaciones = new BotonNav("🔔   Notificaciones");
-        BotonNav[] botones = {btnInicio, btnCalendario, btnReloj, btnCronometro, btnNotificaciones};
+        BotonNav btnReportes = new BotonNav("📊   Reportes");
+        BotonNav btnAdmin = new BotonNav("🛡   Administración");
+        BotonNav btnCuenta = new BotonNav("👤   Mi cuenta");
+        BotonNav btnEstado = new BotonNav("🩺   Estado");
+        List<BotonNav> lista = new ArrayList<>(java.util.Arrays.asList(btnInicio, btnCalendario, btnReloj, btnCronometro, btnNotificaciones));
+        if (reportesPanel != null) {
+            lista.add(btnReportes);
+        }
+        if (adminPanel != null) {
+            lista.add(btnAdmin);
+        }
+        lista.add(btnCuenta);
+        lista.add(btnEstado);
+        BotonNav[] botones = lista.toArray(new BotonNav[0]);
+
+        btnReportes.addActionListener(e -> {
+            cardLayout.show(contenido, "reportes");
+            actualizarSeleccion(botones, btnReportes);
+            if (reportesPanel != null) {
+                reportesPanel.cargar();
+            }
+        });
+        btnAdmin.addActionListener(e -> {
+            cardLayout.show(contenido, "admin");
+            actualizarSeleccion(botones, btnAdmin);
+            if (adminPanel != null) {
+                adminPanel.cargar();
+            }
+        });
+        btnCuenta.addActionListener(e -> {
+            cardLayout.show(contenido, "cuenta");
+            actualizarSeleccion(botones, btnCuenta);
+            cuentaPanel.refrescar();
+        });
+        btnEstado.addActionListener(e -> {
+            cardLayout.show(contenido, "estado");
+            actualizarSeleccion(botones, btnEstado);
+            estadoPanel.verificar();
+        });
 
         btnInicio.addActionListener(e -> {
             cardLayout.show(contenido, "inicio");
@@ -322,7 +381,7 @@ class BotonNav extends JButton {
         setContentAreaFilled(true);
         setOpaque(true);
         setCursor(new Cursor(Cursor.HAND_CURSOR));
-        setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 10));
+        setBorder(BorderFactory.createEmptyBorder(9, 22, 9, 10));
         setAlignmentX(Component.CENTER_ALIGNMENT);
         setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
         setBackground(colorNormal);
@@ -1122,12 +1181,14 @@ class CalendarioPanel extends JPanel {
                 BorderFactory.createEmptyBorder(4, 6, 4, 6)
         ));
 
-        JPanel filaAgregarQuitar = new JPanel(new GridLayout(1, 2, 8, 0));
+        JPanel filaAgregarQuitar = new JPanel(new GridLayout(1, 3, 8, 0));
         filaAgregarQuitar.setBackground(Tema.FONDO);
         filaAgregarQuitar.setAlignmentX(Component.LEFT_ALIGNMENT);
         JButton agregarBtn = BotonEstilo.crear("Agregar", new Color(60, 140, 90), Tema.TEXTO);
+        JButton editarBtn = BotonEstilo.crear("Editar", Tema.FONDO_DIAS, Tema.TEXTO);
         JButton quitarBtn = BotonEstilo.crear("Quitar", new Color(170, 60, 60), Tema.TEXTO);
         filaAgregarQuitar.add(agregarBtn);
+        filaAgregarQuitar.add(editarBtn);
         filaAgregarQuitar.add(quitarBtn);
 
         JButton cerrarBtn = BotonEstilo.crear("Cerrar", Tema.FONDO_SECUNDARIO, Tema.TEXTO);
@@ -1135,12 +1196,27 @@ class CalendarioPanel extends JPanel {
 
         agregarBtn.addActionListener(e -> {
             String texto = campoTexto.getText().trim();
-            if (!texto.isEmpty()) {
+            if (!texto.isEmpty() && ConexionBD.agregarRutinaDeFecha(usuarioId, fecha, texto)) {
                 rutinas.add(texto);
                 modelo.addElement(texto);
                 campoTexto.setText("");
-                ConexionBD.agregarRutinaDeFecha(usuarioId, fecha, texto);
                 actualizarCalendario();
+            }
+        });
+        // Modificación: carga la nota elegida en el campo; al tocar Editar de nuevo con otro texto, la reemplaza.
+        editarBtn.addActionListener(e -> {
+            int indice = lista.getSelectedIndex();
+            if (indice == -1) {
+                JOptionPane.showMessageDialog(dialogo, "Elegí una nota de la lista para editarla.", "Editar",
+                        JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            String actual = modelo.get(indice);
+            String nuevo = JOptionPane.showInputDialog(dialogo, "Modificá la nota:", actual);
+            if (nuevo != null && !nuevo.trim().isEmpty() && !nuevo.trim().equals(actual)
+                    && ConexionBD.editarRutinaDeFecha(usuarioId, fecha, actual, nuevo.trim())) {
+                rutinas.set(indice, nuevo.trim());
+                modelo.set(indice, nuevo.trim());
             }
         });
         campoTexto.addActionListener(e -> agregarBtn.doClick());
@@ -1149,10 +1225,11 @@ class CalendarioPanel extends JPanel {
             int indice = lista.getSelectedIndex();
             if (indice != -1) {
                 String textoAEliminar = modelo.get(indice);
-                rutinas.remove(indice);
-                modelo.remove(indice);
-                ConexionBD.eliminarRutinaDeFecha(usuarioId, fecha, textoAEliminar);
-                actualizarCalendario();
+                if (ConexionBD.eliminarRutinaDeFecha(usuarioId, fecha, textoAEliminar)) {
+                    rutinas.remove(indice);
+                    modelo.remove(indice);
+                    actualizarCalendario();
+                }
             }
         });
 
@@ -1319,64 +1396,33 @@ class BotonEstilo {
 }
 
 /**
- * Maneja la conexión a la base de datos MySQL y las operaciones
- * de autenticación y registro de usuarios.
- *
- * IMPORTANTE: ajustá URL_DB, USUARIO_DB y CONTRASENA_DB con los datos
- * de tu propio servidor MySQL, y ejecutá antes el script coliseum_db.sql
- * para crear la base de datos y la tabla "usuarios".
+ * Fachada que usa la interfaz gráfica para hablar con la capa de servicio
+ * (presentación -> servicio -> DAO -> JDBC). No contiene SQL ni credenciales:
+ * la conexión se configura con variables de entorno (ver config/Configuracion.java y .env.example).
+ * Los errores técnicos se registran en coliseum.log y al usuario se le muestra un mensaje claro.
  */
 class ConexionBD {
 
+    private static final UsuarioServicio USUARIOS = new UsuarioServicio();
+    private static final RutinaServicio RUTINAS = new RutinaServicio();
 
-            private static final String URL_DB = "jdbc:mysql://localhost:3306/coliseum_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
-    private static final String USUARIO_DB = "root";
-    private static final String CONTRASENA_DB = "coliseo";
-
-    static {
+    /** Abre una conexión (la usa el motor de recordatorios). Quien la llama debe cerrarla. */
+    static Connection obtenerConexion() throws SQLException {
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-        } catch (ClassNotFoundException e) {
-            System.err.println("No se encontró el driver de MySQL (mysql-connector-j) en el classpath.");
-        }
-        asegurarEsquema();
-    }
-
-    /**
-     * Agrega, si todavía no existen, las columnas que usa el sistema de notificaciones
-     * (preferencia de notificaciones del usuario, hora de entreno de cada día y registro de avisos enviados).
-     * Es idempotente: se puede ejecutar en cada arranque.
-     */
-    private static void asegurarEsquema() {
-        try (Connection con = obtenerConexion()) {
-            agregarColumnaSiFalta(con, "usuarios", "notificaciones", "TINYINT(1) NULL"); // NULL = todavía no eligió
-            agregarColumnaSiFalta(con, "rutina_semanal", "hora", "TIME NULL");
-            try (java.sql.Statement st = con.createStatement()) {
-                // Registra qué avisos ya se mandaron hoy para no repetirlos
-                st.executeUpdate("CREATE TABLE IF NOT EXISTS avisos_entreno ("
-                        + "usuario_id INT NOT NULL, fecha DATE NOT NULL, canal VARCHAR(10) NOT NULL, "
-                        + "PRIMARY KEY (usuario_id, fecha, canal))");
-            }
-        } catch (SQLException e) {
-            System.err.println("No se pudo verificar el esquema de la base de datos: " + e.getMessage());
+            return config.Conexion.obtener();
+        } catch (ColiseumException e) {
+            throw new SQLException(e.getMessage(), e);
         }
     }
 
-    private static void agregarColumnaSiFalta(Connection con, String tabla, String columna, String definicion) throws SQLException {
-        String consulta = "SELECT COUNT(*) FROM information_schema.COLUMNS "
-                + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
-        try (PreparedStatement stmt = con.prepareStatement(consulta)) {
-            stmt.setString(1, tabla);
-            stmt.setString(2, columna);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    return;
-                }
-            }
+    /** Muestra el error al usuario (sin detalles técnicos). Si no hay pantalla, lo escribe en la consola. */
+    private static void informar(ColiseumException e) {
+        if (GraphicsEnvironment.isHeadless()) {
+            System.err.println(e.getMessage());
+            return;
         }
-        try (java.sql.Statement stmt = con.createStatement()) {
-            stmt.executeUpdate("ALTER TABLE " + tabla + " ADD COLUMN " + columna + " " + definicion);
-        }
+        SwingUtilities.invokeLater(() ->
+                JOptionPane.showMessageDialog(null, e.getMessage(), "Coliseum", JOptionPane.WARNING_MESSAGE));
     }
 
     /**
@@ -1384,197 +1430,81 @@ class ConexionBD {
      * Devuelve "" si el texto está vacío (sin hora) y null si el formato es inválido.
      */
     static String normalizarHora(String texto) {
-        if (texto == null || texto.isBlank()) {
-            return "";
-        }
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^([01]?\\d|2[0-3]):([0-5]\\d)$").matcher(texto.trim());
-        if (!m.matches()) {
+        try {
+            return servicio.Validador.hora(texto);
+        } catch (ColiseumException e) {
             return null;
         }
-        return String.format("%02d:%02d", Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
     }
 
-    /** Abre una nueva conexión a la base de datos. Quien la llama debe cerrarla. */
-    static Connection obtenerConexion() throws SQLException {
-        return DriverManager.getConnection(URL_DB, USUARIO_DB, CONTRASENA_DB);
-    }
-
-    /** Convierte una contraseña en texto plano a su hash SHA-256 en hexadecimal. */
-    static String hashearContrasena(String contrasenaPlano) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(contrasenaPlano.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexBuilder = new StringBuilder();
-            for (byte b : hash) {
-                hexBuilder.append(String.format("%02x", b));
-            }
-            return hexBuilder.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /** Devuelve true si el usuario y la contraseña coinciden con un registro existente. */
-    static boolean validarCredenciales(String usuario, String contrasenaPlano) throws SQLException {
-        String sql = "SELECT contrasena_hash FROM usuarios WHERE nombre_usuario = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setString(1, usuario);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    String hashGuardado = rs.getString("contrasena_hash");
-                    return hashGuardado.equals(hashearContrasena(contrasenaPlano));
-                }
-            }
-        }
-        return false;
-    }
-
-    /** Devuelve true si ya existe un usuario con ese nombre. */
-    static boolean existeUsuario(String usuario) throws SQLException {
-        String sql = "SELECT id FROM usuarios WHERE nombre_usuario = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setString(1, usuario);
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next();
-            }
-        }
+    /** Devuelve el usuario si las credenciales son correctas, o null. */
+    static Usuario autenticar(String usuario, String contrasena) throws ColiseumException {
+        return USUARIOS.autenticar(usuario, contrasena).orElse(null);
     }
 
     /** Crea un nuevo usuario. Devuelve false si el nombre de usuario ya estaba en uso. */
-    static boolean registrarUsuario(String usuario, String contrasenaPlano) throws SQLException {
-        if (existeUsuario(usuario)) {
-            return false;
+    static boolean registrarUsuario(String usuario, String contrasena) throws ColiseumException {
+        return USUARIOS.registrar(usuario, contrasena);
+    }
+
+    /** Devuelve el usuario (con su rol) o null si no existe o hubo un error. */
+    static Usuario obtenerUsuario(String nombreUsuario) {
+        try {
+            return USUARIOS.buscarPorNombre(nombreUsuario).orElse(null);
+        } catch (ColiseumException e) {
+            return null;
         }
-        String sql = "INSERT INTO usuarios (nombre_usuario, contrasena_hash) VALUES (?, ?)";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setString(1, usuario);
-            stmt.setString(2, hashearContrasena(contrasenaPlano));
-            stmt.executeUpdate();
-            return true;
-        }
+    }
+
+    /** Devuelve el id numérico de un usuario a partir de su nombre, o -1 si no existe / hubo error. */
+    static int obtenerIdUsuario(String nombreUsuario) {
+        Usuario u = obtenerUsuario(nombreUsuario);
+        return u == null ? -1 : u.getId();
     }
 
     /** Preferencia de notificaciones: null = todavía no eligió, true = activadas, false = desactivadas. */
     static Boolean obtenerNotificaciones(int usuarioId) {
-        String sql = "SELECT notificaciones FROM usuarios WHERE id = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    int valor = rs.getInt("notificaciones");
-                    return rs.wasNull() ? null : valor == 1;
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            return USUARIOS.obtenerNotificaciones(usuarioId);
+        } catch (ColiseumException e) {
+            return null;
         }
-        return null;
     }
 
     /** Guarda si el usuario quiere recibir notificaciones. Devuelve false si no se pudo guardar. */
     static boolean guardarNotificaciones(int usuarioId, boolean activas) {
-        String sql = "UPDATE usuarios SET notificaciones = ? WHERE id = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, activas ? 1 : 0);
-            stmt.setInt(2, usuarioId);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            USUARIOS.guardarNotificaciones(usuarioId, activas);
+            return true;
+        } catch (ColiseumException e) {
             return false;
+        }
+    }
+
+    private static List<RutinaSemanal> semana(int usuarioId) {
+        try {
+            return RUTINAS.cargarSemana(usuarioId);
+        } catch (ColiseumException e) {
+            return new ArrayList<>();
         }
     }
 
     /** Carga la hora de entreno de cada día de la semana (solo los días que la tengan definida). */
     static Map<DayOfWeek, LocalTime> cargarHorasSemanal(int usuarioId) {
         Map<DayOfWeek, LocalTime> resultado = new EnumMap<>(DayOfWeek.class);
-        String sql = "SELECT dia_semana, hora FROM rutina_semanal WHERE usuario_id = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    String hora = rs.getString("hora"); // se lee como texto para evitar conversiones de zona horaria
-                    if (hora != null && !hora.isBlank()) {
-                        resultado.put(DayOfWeek.valueOf(rs.getString("dia_semana")), LocalTime.parse(hora));
-                    }
-                }
+        for (RutinaSemanal r : semana(usuarioId)) {
+            if (r.getHora() != null) {
+                resultado.put(r.getDia(), r.getHora());
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return resultado;
-    }
-
-    /** Guarda el resumen y la hora de entreno de toda la semana. Hora vacía = sin hora (NULL). */
-    static void guardarRutinaSemanal(int usuarioId, Map<DayOfWeek, String> resumenes, Map<DayOfWeek, String> horas) {
-        String sql = "INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios, hora) "
-                + "VALUES (?, ?, ?, '', ?) ON DUPLICATE KEY UPDATE resumen = VALUES(resumen), hora = VALUES(hora)";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            for (Map.Entry<DayOfWeek, String> entrada : resumenes.entrySet()) {
-                String hora = horas.get(entrada.getKey());
-                stmt.setInt(1, usuarioId);
-                stmt.setString(2, entrada.getKey().name());
-                stmt.setString(3, entrada.getValue());
-                if (hora == null || hora.isBlank()) {
-                    stmt.setNull(4, java.sql.Types.VARCHAR);
-                } else {
-                    stmt.setString(4, hora + ":00");
-                }
-                stmt.addBatch();
-            }
-            stmt.executeBatch();
-            // Si cambió una hora, el aviso de hoy en adelante vuelve a estar disponible.
-            try (PreparedStatement limpiar = con.prepareStatement(
-                    "DELETE FROM avisos_entreno WHERE usuario_id = ? AND fecha >= ?")) {
-                limpiar.setInt(1, usuarioId);
-                limpiar.setDate(2, java.sql.Date.valueOf(LocalDate.now()));
-                limpiar.executeUpdate();
-            }
-            Recordatorios.reiniciarAvisosEnMemoria();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            Recordatorios.registrar("No se pudo guardar la rutina semanal: " + e.getMessage());
-        }
-    }
-
-    /** Devuelve el id numérico de un usuario a partir de su nombre, o -1 si no existe / hubo error. */
-    static int obtenerIdUsuario(String nombreUsuario) {
-        String sql = "SELECT id FROM usuarios WHERE nombre_usuario = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setString(1, nombreUsuario);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("id");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return -1;
     }
 
     /** Carga el resumen corto de la rutina semanal de un usuario (día -> texto). */
     static Map<DayOfWeek, String> cargarResumenSemanal(int usuarioId) {
         Map<DayOfWeek, String> resultado = new EnumMap<>(DayOfWeek.class);
-        String sql = "SELECT dia_semana, resumen FROM rutina_semanal WHERE usuario_id = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    DayOfWeek dia = DayOfWeek.valueOf(rs.getString("dia_semana"));
-                    resultado.put(dia, rs.getString("resumen"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        for (RutinaSemanal r : semana(usuarioId)) {
+            resultado.put(r.getDia(), r.getResumen());
         }
         return resultado;
     }
@@ -1582,120 +1512,80 @@ class ConexionBD {
     /** Carga el bloc de notas de ejercicios de la rutina semanal de un usuario (día -> texto). */
     static Map<DayOfWeek, String> cargarEjerciciosSemanal(int usuarioId) {
         Map<DayOfWeek, String> resultado = new EnumMap<>(DayOfWeek.class);
-        String sql = "SELECT dia_semana, ejercicios FROM rutina_semanal WHERE usuario_id = ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    DayOfWeek dia = DayOfWeek.valueOf(rs.getString("dia_semana"));
-                    String ejercicios = rs.getString("ejercicios");
-                    resultado.put(dia, ejercicios == null ? "" : ejercicios);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        for (RutinaSemanal r : semana(usuarioId)) {
+            resultado.put(r.getDia(), r.getEjercicios());
         }
         return resultado;
     }
 
-    /** Guarda (o actualiza) el resumen corto de la rutina semanal completa de un usuario. */
-    static void guardarResumenSemanal(int usuarioId, Map<DayOfWeek, String> resumenes) {
-        String sql = "INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios) "
-                + "VALUES (?, ?, ?, '') ON DUPLICATE KEY UPDATE resumen = VALUES(resumen)";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            for (Map.Entry<DayOfWeek, String> entrada : resumenes.entrySet()) {
-                stmt.setInt(1, usuarioId);
-                stmt.setString(2, entrada.getKey().name());
-                stmt.setString(3, entrada.getValue());
-                stmt.addBatch();
-            }
-            stmt.executeBatch();
-        } catch (SQLException e) {
-            e.printStackTrace();
+    /** Guarda el resumen y la hora de toda la semana (en una transacción). Hora vacía = sin hora. */
+    static void guardarRutinaSemanal(int usuarioId, Map<DayOfWeek, String> resumenes, Map<DayOfWeek, String> horas) {
+        try {
+            RUTINAS.guardarSemana(usuarioId, resumenes, horas);
+            Recordatorios.reiniciarAvisosEnMemoria();
+        } catch (ColiseumException e) {
+            Recordatorios.registrar("No se pudo guardar la rutina semanal: " + e.getMessage());
+            informar(e);
         }
     }
 
     /** Guarda (o actualiza) el bloc de notas de ejercicios de un día puntual de la semana. */
     static void guardarEjerciciosDia(int usuarioId, DayOfWeek dia, String ejercicios) {
-        String sql = "INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios) "
-                + "VALUES (?, ?, '', ?) ON DUPLICATE KEY UPDATE ejercicios = VALUES(ejercicios)";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            stmt.setString(2, dia.name());
-            stmt.setString(3, ejercicios);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            RUTINAS.guardarEjercicios(usuarioId, dia, ejercicios);
+        } catch (ColiseumException e) {
+            informar(e);
         }
     }
 
     /** Devuelve las notas puntuales guardadas para una fecha exacta del calendario. */
     static List<String> cargarRutinasDeFecha(int usuarioId, LocalDate fecha) {
-        List<String> resultado = new ArrayList<>();
-        String sql = "SELECT descripcion FROM rutinas_dia WHERE usuario_id = ? AND fecha = ? ORDER BY id";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            stmt.setDate(2, java.sql.Date.valueOf(fecha));
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(rs.getString("descripcion"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            return RUTINAS.listarNotas(usuarioId, fecha);
+        } catch (ColiseumException e) {
+            return new ArrayList<>();
         }
-        return resultado;
     }
 
     /** Devuelve qué fechas de un mes tienen al menos una nota cargada (para marcarlas en el calendario). */
     static Set<LocalDate> cargarFechasConRutina(int usuarioId, YearMonth mes) {
-        Set<LocalDate> resultado = new HashSet<>();
-        String sql = "SELECT DISTINCT fecha FROM rutinas_dia WHERE usuario_id = ? AND fecha BETWEEN ? AND ?";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            stmt.setDate(2, java.sql.Date.valueOf(mes.atDay(1)));
-            stmt.setDate(3, java.sql.Date.valueOf(mes.atEndOfMonth()));
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(rs.getDate("fecha").toLocalDate());
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return resultado;
-    }
-
-    /** Agrega una nota puntual a una fecha del calendario. */
-    static void agregarRutinaDeFecha(int usuarioId, LocalDate fecha, String descripcion) {
-        String sql = "INSERT INTO rutinas_dia (usuario_id, fecha, descripcion) VALUES (?, ?, ?)";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            stmt.setDate(2, java.sql.Date.valueOf(fecha));
-            stmt.setString(3, descripcion);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            return RUTINAS.fechasConNotas(usuarioId, mes);
+        } catch (ColiseumException e) {
+            return new HashSet<>();
         }
     }
 
-    /** Elimina una nota puntual de una fecha (borra la primera coincidencia exacta de texto). */
-    static void eliminarRutinaDeFecha(int usuarioId, LocalDate fecha, String descripcion) {
-        String sql = "DELETE FROM rutinas_dia WHERE usuario_id = ? AND fecha = ? AND descripcion = ? LIMIT 1";
-        try (Connection con = obtenerConexion();
-             PreparedStatement stmt = con.prepareStatement(sql)) {
-            stmt.setInt(1, usuarioId);
-            stmt.setDate(2, java.sql.Date.valueOf(fecha));
-            stmt.setString(3, descripcion);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+    /** Agrega una nota puntual a una fecha. Devuelve true si se guardó. */
+    static boolean agregarRutinaDeFecha(int usuarioId, LocalDate fecha, String descripcion) {
+        try {
+            RUTINAS.agregarNota(usuarioId, fecha, descripcion);
+            return true;
+        } catch (ColiseumException e) {
+            informar(e);
+            return false;
+        }
+    }
+
+    /** Modifica el texto de una nota puntual. Devuelve true si se guardó. */
+    static boolean editarRutinaDeFecha(int usuarioId, LocalDate fecha, String textoActual, String textoNuevo) {
+        try {
+            RUTINAS.editarNota(usuarioId, fecha, textoActual, textoNuevo);
+            return true;
+        } catch (ColiseumException e) {
+            informar(e);
+            return false;
+        }
+    }
+
+    /** Elimina una nota puntual de una fecha. Devuelve true si no hubo errores. */
+    static boolean eliminarRutinaDeFecha(int usuarioId, LocalDate fecha, String descripcion) {
+        try {
+            RUTINAS.eliminarNota(usuarioId, fecha, descripcion);
+            return true;
+        } catch (ColiseumException e) {
+            informar(e);
+            return false;
         }
     }
 }
@@ -1862,16 +1752,16 @@ class LoginDialog extends JDialog {
         }
 
         try {
-            if (ConexionBD.validarCredenciales(usuario, contrasena)) {
+            Usuario u = ConexionBD.autenticar(usuario, contrasena);
+            if (u != null) {
                 autenticado = true;
-                usuarioActual = usuario;
+                usuarioActual = u.getNombre();
                 dispose();
             } else {
                 mostrarError(mensajeLogin, "Usuario o contraseña incorrectos.");
             }
-        } catch (SQLException ex) {
-            mostrarError(mensajeLogin, "Error: " + ex.getMessage());
-            ex.printStackTrace();
+        } catch (ColiseumException ex) {
+            mostrarError(mensajeLogin, ex.getMessage());
         }
     }
 
@@ -1888,8 +1778,8 @@ class LoginDialog extends JDialog {
             mostrarError(mensajeRegistro, "El usuario debe tener al menos 3 caracteres.");
             return;
         }
-        if (contrasena.length() < 4) {
-            mostrarError(mensajeRegistro, "La contraseña debe tener al menos 4 caracteres.");
+        if (contrasena.length() < 6) {
+            mostrarError(mensajeRegistro, "La contraseña debe tener al menos 6 caracteres.");
             return;
         }
         if (!contrasena.equals(confirmar)) {
@@ -1910,9 +1800,8 @@ class LoginDialog extends JDialog {
             } else {
                 mostrarError(mensajeRegistro, "Ese nombre de usuario ya existe.");
             }
-        } catch (SQLException ex) {
-            mostrarError(mensajeRegistro, "Error: " + ex.getMessage());
-            ex.printStackTrace();
+        } catch (ColiseumException ex) {
+            mostrarError(mensajeRegistro, ex.getMessage());
         }
     }
 

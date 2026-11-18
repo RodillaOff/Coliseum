@@ -1,0 +1,63 @@
+# Construye la imagen, la escanea con Trivy y la publica en GitHub Container Registry (ghcr.io).
+# No hace falta ningún secreto: usa el GITHUB_TOKEN del propio repositorio.
+name: Publicar imagen en ghcr.io
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nombre de la imagen (en minúsculas)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/coliseum
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+
+      - name: Construir imagen (sin publicar todavía)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: coliseum-local:scan
+
+      - name: Escaneo de la imagen con Trivy (hallazgos HIGH y CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: coliseum-local:scan
+          severity: HIGH,CRITICAL
+          format: table
+          output: trivy-imagen.txt
+          exit-code: "0"          # informa pero no corta el despliegue; los hallazgos se documentan
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trivy-imagen
+          path: trivy-imagen.txt
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar en ghcr.io
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

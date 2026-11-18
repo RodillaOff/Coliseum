@@ -1,5 +1,11 @@
 @echo off
 cd /d "%~dp0"
+if not exist ".env" if not exist "..\..\.env" (
+    echo Falta el archivo .env con los datos de la base de datos.
+    echo Copia .env.example a .env en la raiz del proyecto y completalo ^(ver README^).
+    pause
+    exit /b
+)
 echo Compilando Coliseum...
 javac -encoding UTF-8 -cp ".;lib\mysql-connector-j-26.7.0.jar" Coliseum.java
 if %errorlevel% neq 0 (

@@ -1,0 +1,11 @@
+# Configuración NO secreta (hosts, puertos, nombres).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coliseum-config
+data:
+  DB_HOST: "coliseum-db"      # nombre del Service de la base (db-service.yaml)
+  DB_PORT: "3306"
+  DB_NAME: "coliseum_db"
+  DB_SSL_MODE: "DISABLED"     # base dentro del clúster; contra Aiven sería REQUIRED
+  APP_PORT: "8080"

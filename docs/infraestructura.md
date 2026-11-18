@@ -1,73 +1,73 @@
 # Infraestructura - Coliseum
 
-## Diagrama
+Coliseum es una aplicación **de escritorio**. La ventana Swing corre en la PC del usuario y se conecta a MySQL. Para Docker y Kubernetes se usa el **modo servicio** (`consola.ConsolaMain --servicio`), sin ventana, que verifica la base y expone `GET /health`.
+
+## Diagrama por entorno
 
 ```mermaid
 flowchart TB
-    PC[" Computadora del usuario"]
-
-    subgraph JVM["Java (JVM)"]
-        direction TB
-        APP["Aplicación Coliseum<br/>Java Swing"]
-        REC["Recordatorios<br/>hilo de fondo, revisa cada 30 s"]
-        BAN["Bandeja del sistema<br/>icono y avisos"]
+    subgraph PC["PC del usuario"]
+        APP["Coliseum (Swing)<br/>capas: presentación, servicio, DAO"]
+        REC["Recordatorios<br/>hilo de fondo cada 30 s"]
+        BAN["Bandeja del sistema y toast de Windows"]
         JDBC["Driver JDBC<br/>mysql-connector-j"]
+        ENV[".env<br/>(fuera de Git)"]
     end
 
-    subgraph ARCH["Archivos locales"]
-        direction TB
-        CFG["coliseum.properties<br/>(opcional)"]
-        LOGO["logo.png<br/>(opcional)"]
-        LOG["recordatorios.log"]
+    subgraph DOCKER["Docker / docker compose"]
+        CAPP["Contenedor app<br/>modo servicio :8080/health"]
+        CDB[("MySQL 8 local<br/>volumen coliseum-datos")]
     end
 
-    WIN["Windows<br/>notificaciones de escritorio"]
-
-    subgraph SRV["Servidor local"]
-        direction TB
-        MYSQL["MySQL<br/>localhost:3306"]
-        subgraph BD["Base de datos: coliseum_db"]
-            direction TB
-            T1[("usuarios")]
-            T2[("rutina_semanal")]
-            T3[("rutinas_dia")]
-            T4[("avisos_entreno")]
-        end
+    subgraph K8S["Kubernetes (minikube / kind)"]
+        PA["Deployment + Service coliseum-app"]
+        PD["Deployment + Service + PVC coliseum-db"]
+        CM["ConfigMap"]
+        SE["Secret"]
     end
 
-    PC --> APP
-    APP -->|"consultas SQL"| JDBC
+    AIVEN[("Aiven<br/>MySQL en la nube (SSL)")]
+    GH["GitHub<br/>repositorio + Actions"]
+    GHCR["ghcr.io<br/>imagen coliseum"]
+
+    ENV -.->|"DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSL_MODE"| APP
     APP --> REC
-    APP --> BAN
-    REC -->|"consultas SQL"| JDBC
-    REC -->|"aviso de entreno"| BAN
-    BAN -->|"PowerShell"| WIN
-    CFG -.->|"configura"| REC
-    LOGO -.->|"icono"| BAN
-    REC -.->|"registra"| LOG
-    JDBC -->|"conexión"| MYSQL
-    MYSQL --> T1
-    MYSQL --> T2
-    MYSQL --> T3
-    MYSQL --> T4
+    REC --> BAN
+    APP --> JDBC
+    JDBC -->|"JDBC + SSL"| AIVEN
+    JDBC -.->|"alternativa local"| CDB
+    CAPP --> CDB
+    PA --> PD
+    CM -.-> PA
+    SE -.-> PA
+    SE -.-> PD
+    GH -->|"push a main"| GHCR
+    GHCR --> CAPP
+    GHCR --> PA
 ```
+
+| Entorno | Qué corre | Base de datos | Cómo se configura |
+|---|---|---|---|
+| PC (Nivel 2) | Ventana Swing (`Coliseum Launcher.bat`) | Aiven, con SSL | `.env` local |
+| Docker (Nivel 1) | Contenedor `app` en modo servicio | Contenedor `db` (MySQL 8) | `.env` leído por `docker-compose.yml` |
+| Kubernetes (Nivel 3) | Pod `coliseum-app` | Pod `coliseum-db` con PVC | `ConfigMap` + `Secret` |
 
 ## Modelo de datos
 
 ```mermaid
 erDiagram
-    usuarios ||--o{ rutina_semanal : "tiene"
-    usuarios ||--o{ rutinas_dia : "tiene"
-    usuarios ||--o{ avisos_entreno : "recibe"
+    usuarios ||--o{ rutina_semanal : "tiene (1:N)"
+    usuarios ||--o{ rutinas_dia : "tiene (1:N)"
+    usuarios ||--o{ avisos_entreno : "recibe (1:N)"
 
     usuarios {
         int id PK
         varchar nombre_usuario UK
         varchar contrasena_hash
-        timestamp fecha_registro
+        varchar rol "ADMIN | USUARIO"
         tinyint notificaciones
+        timestamp fecha_registro
     }
-
     rutina_semanal {
         int usuario_id PK, FK
         varchar dia_semana PK
@@ -75,61 +75,71 @@ erDiagram
         text ejercicios
         time hora
     }
-
     rutinas_dia {
         int id PK
         int usuario_id FK
         date fecha
         varchar descripcion
     }
-
     avisos_entreno {
-        int usuario_id PK
+        int usuario_id PK, FK
         date fecha PK
         varchar canal PK
     }
 ```
 
 | Tabla | Para qué sirve |
-|-------|----------------|
-| `usuarios` | Usuario (único), contraseña cifrada con SHA-256 y preferencia de notificaciones (sin elegir, activadas o desactivadas) |
+|---|---|
+| `usuarios` | Usuario único, hash PBKDF2 de la contraseña, rol (`ADMIN`/`USUARIO`) y preferencia de notificaciones (sin elegir, activadas o desactivadas) |
 | `rutina_semanal` | Resumen, ejercicios y hora de inicio de cada día de la semana |
-| `rutinas_dia` | Rutinas de una fecha concreta del calendario |
-| `avisos_entreno` | Registro de los avisos de entreno ya enviados, para no repetirlos (se limpian los de más de 7 días) |
+| `rutinas_dia` | Notas de una fecha concreta del calendario |
+| `avisos_entreno` | Avisos de entreno ya enviados, para no repetirlos (se limpian al guardar la rutina semanal) |
 
-Si se borra un usuario, se borran también sus rutinas (`ON DELETE CASCADE`). La tabla `avisos_entreno` no tiene clave foránea, así que sus registros no se borran en cascada.
+Todas las claves foráneas usan `ON DELETE CASCADE`: al borrar un usuario se borran sus rutinas y avisos. El esquema se crea **solo** con `sql/01-crear-tablas.sql` (idempotente); la aplicación no ejecuta DDL.
 
-La columna `notificaciones`, la columna `hora` y la tabla `avisos_entreno` no están en el script de Workbench: la aplicación las crea sola al arrancar si faltan.
+## Variables de entorno (R10)
+
+| Variable | Uso |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Dónde está la base (por defecto el puerto es 3306) |
+| `DB_USER`, `DB_PASSWORD` | Credenciales. No tienen valor por defecto |
+| `DB_SSL_MODE` | `REQUIRED` (por defecto, Aiven) o `DISABLED` (solo la base local de Docker) |
+| `DB_ROOT_PASSWORD` | Solo `docker compose` (root de MySQL en el contenedor) |
+| `APP_PORT` | Puerto de `/health` (8080 por defecto) |
+
+El archivo `.env` está en `.gitignore`; `.env.example` lista los nombres sin valores.
 
 ## Requisitos para ejecutarlo
 
-1. Tener instalado Java (JDK 11 o superior).
-2. Tener MySQL corriendo en el puerto 3306.
-3. Ejecutar el script `Coliseo_Workbench.sql` en MySQL Workbench para crear la base `coliseum_db` y las tablas.
-4. Tener `mysql-connector-j` en el classpath.
-5. Para las notificaciones de escritorio: un sistema con bandeja del sistema (recomendado Windows, con PowerShell y las notificaciones activadas en Configuración > Sistema > Notificaciones).
-6. Opcional: `logo.png` junto al programa (icono de la ventana, la barra de tareas y la bandeja).
-7. Opcional: `coliseum.properties` junto al programa para cambiar los avisos. Si no existe, se usan los valores por defecto.
+1. Java (JDK 11 o superior) para la ventana de escritorio.
+2. Docker Desktop (`docker compose`), `kubectl` y `minikube` o `kind` para los niveles 1 y 3.
+3. Una base MySQL: la del contenedor (`docker compose up`) o la de Aiven.
+4. `.env` completado a partir de `.env.example`.
+5. Para las notificaciones de escritorio: Windows con PowerShell y las notificaciones activadas (Configuración > Sistema > Notificaciones).
+6. Opcional: `coliseum.properties` junto al programa para ajustar los avisos.
 
 | Propiedad | Por defecto | Para qué sirve |
-|-----------|-------------|----------------|
-| `recordatorio.hora_por_defecto` | `18:00` | Hora de entreno de los días que no tienen hora propia |
+|---|---|---|
+| `recordatorio.hora_por_defecto` | `18:00` | Hora de entreno de los días sin hora propia |
 | `recordatorio.minutos_antes` | `20` | Minutos de anticipación del aviso |
-| `recordatorio.ventana_minutos` | `30` | Tiempo de tolerancia para avisar si la app estaba cerrada |
+| `recordatorio.ventana_minutos` | `30` | Tolerancia para avisar si la app estaba cerrada |
 
 ## Modos de ejecución
 
 | Comando | Qué hace |
-|---------|----------|
-| `java Coliseum` | Abre la aplicación con login. Si ya hay una instancia abierta, la trae al frente |
+|---|---|
+| `src/Coliseum/Coliseum Launcher.bat` | Compila y abre la ventana (inicio de sesión) |
 | `java Coliseum --recordatorios` | Servicio de avisos sin ventana para todos los usuarios |
-| `java Coliseum --simular "2026-09-30 18:00"` | Muestra a quién se avisaría a esa fecha y hora, sin enviar nada |
-| `java -Dcoliseum.gpu=true Coliseum` | Reactiva la aceleración gráfica por GPU (desactivada por defecto) |
-| `java -Dcoliseum.puerto=NNNNN Coliseum` | Fuerza el puerto local usado para la instancia única |
+| `java Coliseum --simular "AAAA-MM-DD HH:mm"` | Muestra a quién se avisaría en ese momento, sin enviar nada |
+| `docker compose up --build` | App (modo servicio) y base local |
+| `docker compose run --rm app --consola` | Menú de texto: sesión, notas, reportes y estado |
+| `consola.ConsolaMain --health` | Código de salida 0 (todo bien) o 1 (falla); es el healthcheck de compose |
+| `GET http://localhost:8080/health` | 200 si la app y la base funcionan, 503 si no |
 
 ## Archivos que genera
 
 | Archivo | Para qué sirve |
-|---------|----------------|
-| `recordatorios.log` | Registro de avisos enviados, reintentos, diagnósticos y errores |
-| `coliseum-recordatorios.lock` (carpeta temporal del sistema) | Evita que haya dos servicios de avisos a la vez |
+|---|---|
+| `coliseum.log` | Detalle técnico de los errores (el usuario solo ve mensajes claros). Está en `.gitignore` |
+| `recordatorios.log` | Avisos enviados, reintentos y diagnósticos |
+| `coliseum-recordatorios.lock` (carpeta temporal) | Evita dos servicios de avisos a la vez |

@@ -14,3 +14,8 @@ target/
 
 .DS_Store
 Thumbs.db
+
+# Secretos y archivos locales (Nivel 1: credenciales fuera del código)
+.env
+k8s/secret.yaml
+coliseum.log

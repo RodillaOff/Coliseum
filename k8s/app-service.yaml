@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: coliseum-app
+spec:
+  type: NodePort              # minikube service coliseum-app --url
+  selector:
+    app: coliseum-app
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080

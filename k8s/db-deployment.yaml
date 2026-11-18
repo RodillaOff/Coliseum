@@ -1,0 +1,76 @@
+# Base de datos MySQL dentro del clúster (para el taller). Datos en un volumen persistente.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: coliseum-db-datos
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coliseum-db
+  labels:
+    app: coliseum-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # un solo MySQL escribiendo en el volumen
+  selector:
+    matchLabels:
+      app: coliseum-db
+  template:
+    metadata:
+      labels:
+        app: coliseum-db
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: coliseum-secret, key: MYSQL_ROOT_PASSWORD}
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef: {name: coliseum-secret, key: DB_USER}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: coliseum-secret, key: DB_PASSWORD}
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef: {name: coliseum-config, key: DB_NAME}
+          resources:
+            requests: {cpu: "100m", memory: "512Mi"}
+            limits: {cpu: "500m", memory: "1Gi"}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/mysql
+            - name: sql-inicial
+              mountPath: /docker-entrypoint-initdb.d   # se ejecuta solo la primera vez (volumen vacío)
+              readOnly: true
+      volumes:
+        - name: datos
+          persistentVolumeClaim:
+            claimName: coliseum-db-datos
+        - name: sql-inicial
+          configMap:
+            name: coliseum-sql   # kubectl create configmap coliseum-sql --from-file=sql/
