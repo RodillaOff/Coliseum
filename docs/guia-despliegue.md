@@ -42,7 +42,8 @@ docker compose ps
 curl http://localhost:8080/health          # responde OK (200)
 ```
 ![Descripción de la captura](<img width="1579" height="157" alt="1" src="https://github.com/user-attachments/assets/eee3f15f-195e-4379-8de7-12703f3c461b" />
-)
+)<img width="1579" height="157" alt="1" src="https://github.com/user-attachments/assets/e34bf50b-0bc0-4fcc-997a-a75b9cdad0fc" />
+
 
 ### 1.2 Comprobar que la app guarda y lee datos de la base del contenedor
 
