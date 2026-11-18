@@ -16,7 +16,7 @@ jobs:
   imagen:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Nombre de la imagen (en minúsculas)
         id: meta
