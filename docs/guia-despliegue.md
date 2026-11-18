@@ -41,7 +41,6 @@ La primera vez, PostgreSQL ejecuta solos `sql/01-crear-tablas.sql` y `sql/02-dat
 docker compose ps
 curl http://localhost:8080/health          # responde OK (200)
 ```
-![Descripción de la captura](<img width="1579" height="157" alt="1" src="https://github.com/user-attachments/assets/eee3f15f-195e-4379-8de7-12703f3c461b" />
 )<img width="1579" height="157" alt="1" src="https://github.com/user-attachments/assets/e34bf50b-0bc0-4fcc-997a-a75b9cdad0fc" />
 
 
@@ -58,8 +57,7 @@ docker compose exec db psql -U coliseum -d coliseum_db -c "SELECT id, usuario_id
 > Cuentas de prueba (solo para demostración): `admin` / `Admin#2026` (rol ADMIN); `ana`, `bruno`, `carla`, `diego` / `Prueba#2026` (rol USUARIO).
 > Están cargadas como hash en `sql/02-datos-prueba.sql`. En un entorno real se cambian.
 
-📸 ![Descripción de la captura](<img width="1600" height="710" alt="11" src="https://github.com/user-attachments/assets/bb8a5726-8223-470e-a3a1-7cd95dcd3271" />
-) `docker compose up` funcionando y la nota guardada/consultada.
+📸 <img width="1600" height="710" alt="11" src="https://github.com/user-attachments/assets/c32ad3ff-26f9-4945-bb3d-271d7f8946c7" />
 
 ### 1.3 Publicar la imagen en GitHub Container Registry
 
@@ -76,8 +74,8 @@ docker build -t ghcr.io/<usuario>/coliseum:latest .
 docker push ghcr.io/<usuario>/coliseum:latest
 ```
 
-📸 ![Descripción de la captura](<img width="764" height="264" alt="22" src="https://github.com/user-attachments/assets/63f8225e-1899-477f-9885-b488d045c9fb" />
-)
+📸 <img width="764" height="264" alt="22" src="https://github.com/user-attachments/assets/c417fa36-6e1f-4f0d-a025-650d36661c36" />
+
 ## Nivel 2. Llevarlo a la nube (Aiven, PostgreSQL)
 
 > **Por qué PostgreSQL:** desde el 6/11/2026 Aiven ya no permite crear bases **MySQL** gratuitas
@@ -130,10 +128,9 @@ ORDER BY r.id DESC LIMIT 5;
 
 > Aiven apaga los servicios Free sin uso: si no conecta, encendelo desde la consola (*Power on*) antes de la defensa.
 
-📸 ![Descripción de la captura](<img width="927" height="716" alt="4" src="https://github.com/user-attachments/assets/e5f3a90b-ea19-4f03-8fcb-033d9308ba52" />
-)
-![Descripción de la captura](<img width="886" height="197" alt="3" src="https://github.com/user-attachments/assets/00fa167e-9fe1-48ec-b391-a1ad0cc7dfa2" />
-)
+📸 <img width="927" height="716" alt="4" src="https://github.com/user-attachments/assets/733bdf6d-8f00-4fde-b717-6de0f2d4a428" />
+<img width="886" height="197" alt="3" src="https://github.com/user-attachments/assets/6eed9827-801e-4e11-8e81-cd13a9742f13" />
+
 
 (Render no aplica: el proyecto es de escritorio.)
 
