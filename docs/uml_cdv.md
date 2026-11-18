@@ -27,7 +27,7 @@ flowchart TB
     MOD["modelo<br/>Usuario · Rol · RutinaDia · RutinaSemanal · FilaReporte · EstadoServicio"]
     SEG["seguridad<br/>HashContrasena · Pbkdf2Hash · Sha256Hash · Hashes"]
     EXC["excepciones<br/>ColiseumException y derivadas"]
-    DB[("MySQL<br/>local en Docker o Aiven")]
+    DB[("PostgreSQL<br/>local en Docker o Aiven")]
 
     SW --> SERV
     CON --> SERV

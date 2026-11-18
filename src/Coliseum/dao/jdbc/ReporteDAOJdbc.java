@@ -30,7 +30,7 @@ public class ReporteDAOJdbc implements ReporteDAO {
             parametros.add(usuarioId);
         }
         if (texto != null && !texto.isEmpty()) {
-            sql.append(" AND r.descripcion LIKE ?");
+            sql.append(" AND r.descripcion ILIKE ?"); // ILIKE: sin distinguir mayúsculas (como LIKE en MySQL)
             parametros.add("%" + texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
         }
         if (desde != null) {
@@ -85,9 +85,9 @@ public class ReporteDAOJdbc implements ReporteDAO {
 
     @Override
     public Map<String, Long> notasPorMes(Connection con, Integer usuarioId) throws SQLException {
-        String sql = "SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, COUNT(*) AS cantidad FROM rutinas_dia "
+        String sql = "SELECT to_char(fecha, 'YYYY-MM') AS mes, COUNT(*) AS cantidad FROM rutinas_dia "
                 + (usuarioId != null ? "WHERE usuario_id = ? " : "")
-                + "GROUP BY DATE_FORMAT(fecha, '%Y-%m') ORDER BY mes";
+                + "GROUP BY to_char(fecha, 'YYYY-MM') ORDER BY mes";
         Map<String, Long> meses = new LinkedHashMap<>();
         try (PreparedStatement st = con.prepareStatement(sql)) {
             if (usuarioId != null) {

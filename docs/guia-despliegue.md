@@ -21,11 +21,10 @@ Completá `.env` (el archivo no se sube a Git). Para el Nivel 1 (base local en D
 | Variable | Ejemplo para Docker local |
 |---|---|
 | `DB_HOST` | `localhost` (solo para la ventana; el contenedor usa `db`) |
-| `DB_PORT` | `3307` (puerto publicado por compose) |
+| `DB_PORT` | `5433` (puerto publicado por compose) |
 | `DB_NAME` | `coliseum_db` |
-| `DB_USER` | `coliseum` (no puede ser `root`) |
+| `DB_USER` | `coliseum` |
 | `DB_PASSWORD` | una contraseña que elijas |
-| `DB_ROOT_PASSWORD` | otra contraseña que elijas |
 | `DB_SSL_MODE` | `DISABLED` |
 
 ## Nivel 1. Contenerizar
@@ -36,7 +35,7 @@ Completá `.env` (el archivo no se sube a Git). Para el Nivel 1 (base local en D
 docker compose up --build
 ```
 
-La primera vez, MySQL ejecuta solos `sql/01-crear-tablas.sql` y `sql/02-datos-prueba.sql`. Esperá a que `coliseum-app` quede `healthy`.
+La primera vez, PostgreSQL ejecuta solos `sql/01-crear-tablas.sql` y `sql/02-datos-prueba.sql`. Esperá a que `coliseum-app` quede `healthy`.
 
 ```bash
 docker compose ps
@@ -50,7 +49,7 @@ docker compose run --rm app --consola
 # 1) Iniciar sesión → usuario: ana   contraseña: Prueba#2026
 # 2) Agregar nota → fecha 2026-11-20 → "Prueba desde Docker"
 # 1) Ver notas de esa fecha → debe aparecer
-docker compose exec db mysql -u"$DB_USER" -p coliseum_db -e "SELECT id, usuario_id, fecha, descripcion FROM rutinas_dia ORDER BY id DESC LIMIT 5;"
+docker compose exec db psql -U coliseum -d coliseum_db -c "SELECT id, usuario_id, fecha, descripcion FROM rutinas_dia ORDER BY id DESC LIMIT 5;"
 ```
 
 > Cuentas de prueba (solo para demostración): `admin` / `Admin#2026` (rol ADMIN); `ana`, `bruno`, `carla`, `diego` / `Prueba#2026` (rol USUARIO).
@@ -75,20 +74,29 @@ docker push ghcr.io/<usuario>/coliseum:latest
 
 📸 **Captura 2:** la imagen publicada en `ghcr.io` (pestaña Packages).
 
-## Nivel 2. Llevarlo a la nube (Aiven)
+## Nivel 2. Llevarlo a la nube (Aiven, PostgreSQL)
 
-1. Entrá a <https://aiven.io>, creá la cuenta y un servicio **MySQL** con el plan **Free**.
-2. Cuando esté en *Running*, copiá de la consola: *Host*, *Port*, *User*, *Password* y el nombre de la base (por defecto `defaultdb`).
-3. Cargá los scripts contra Aiven (con cliente MySQL instalado, o con Docker si no lo tenés):
+> **Por qué PostgreSQL:** desde el 6/11/2026 Aiven ya no permite crear bases **MySQL** gratuitas
+> (solo con plan pago). El plan **Free de PostgreSQL** sigue disponible y sin tarjeta, y la consigna
+> admite "Aiven (MySQL o PostgreSQL)". Por eso el proyecto usa PostgreSQL en todos los niveles.
 
-```bash
-# con cliente mysql
-mysql -h <HOST> -P <PUERTO> -u <USUARIO> -p --ssl-mode=REQUIRED defaultdb < sql/01-crear-tablas.sql
-mysql -h <HOST> -P <PUERTO> -u <USUARIO> -p --ssl-mode=REQUIRED defaultdb < sql/02-datos-prueba.sql
-
-# sin cliente instalado
-docker run --rm -i mysql:8.0 mysql -h <HOST> -P <PUERTO> -u <USUARIO> -p --ssl-mode=REQUIRED defaultdb < sql/01-crear-tablas.sql
-```
+1. Entrá a <https://console.aiven.io>, creá la cuenta y un servicio **PostgreSQL** con el plan **Free**
+   (nombre `coliseum`). El plan gratis permite un solo PostgreSQL por organización.
+2. Cuando esté en *Running*, copiá de *Overview → Connection information*: *Host*, *Port*, *User*
+   (`avnadmin`), *Password* y *Database name* (`defaultdb`). En *CA certificate* tocá **Download** y
+   guardá el archivo como `ca.pem` en la raíz del proyecto (está en `.gitignore`).
+3. Cargá los scripts contra Aiven. Hay tres formas:
+   - **Sin instalar nada:** en la consola de Aiven, *SQL editor*: pegá el contenido de
+     `sql/01-crear-tablas.sql`, **Run**; después el de `sql/02-datos-prueba.sql`, **Run**.
+   - **Con `psql` instalado:**
+     ```bash
+     psql "host=<HOST> port=<PUERTO> dbname=defaultdb user=avnadmin sslmode=verify-full sslrootcert=ca.pem" -f sql/01-crear-tablas.sql
+     psql "host=<HOST> port=<PUERTO> dbname=defaultdb user=avnadmin sslmode=verify-full sslrootcert=ca.pem" -f sql/02-datos-prueba.sql
+     ```
+   - **Con Docker:**
+     ```bash
+     docker run --rm -it -v "$PWD":/w -w /w postgres:16-alpine psql "host=<HOST> port=<PUERTO> dbname=defaultdb user=avnadmin sslmode=verify-full sslrootcert=ca.pem" -f sql/01-crear-tablas.sql
+     ```
 
 4. Apuntá la aplicación a Aiven editando **solo** tu `.env` local:
 
@@ -96,21 +104,27 @@ docker run --rm -i mysql:8.0 mysql -h <HOST> -P <PUERTO> -u <USUARIO> -p --ssl-m
 DB_HOST=<host de Aiven>
 DB_PORT=<puerto de Aiven>
 DB_NAME=defaultdb
-DB_USER=<usuario de Aiven>
+DB_USER=avnadmin
 DB_PASSWORD=<contraseña de Aiven>
-DB_SSL_MODE=REQUIRED
+DB_SSL_MODE=VERIFY_IDENTITY
+DB_SSL_ROOT_CERT=C:\ruta\al\proyecto\ca.pem
 ```
+
+`VERIFY_IDENTITY` cifra la conexión **y** comprueba con `ca.pem` que el servidor es realmente el de
+Aiven. Con `REQUIRED` solo cifra (también funciona, sin `DB_SSL_ROOT_CERT`).
 
 5. Abrí la ventana (`src/Coliseum/Coliseum Launcher.bat`), iniciá sesión, entrá a **Estado** → *Verificar conexión*: debe decir *conexión cifrada (SSL): sí*. Creá una nota en el calendario.
-6. Comprobá con un SELECT directo sobre Aiven:
+6. Comprobá con un SELECT directo sobre Aiven (en el *SQL editor* de la consola, o con `psql`):
 
-```bash
-mysql -h <HOST> -P <PUERTO> -u <USUARIO> -p --ssl-mode=REQUIRED defaultdb -e "SELECT * FROM rutinas_dia ORDER BY id DESC LIMIT 5;"
+```sql
+SELECT r.id, u.nombre_usuario, r.fecha, r.descripcion
+FROM rutinas_dia r JOIN usuarios u ON u.id = r.usuario_id
+ORDER BY r.id DESC LIMIT 5;
 ```
 
-7. Repetí el paso 4 y 5 en **otra PC** (con su propio `.env`): debe verse la misma nota.
+7. Repetí los pasos 4 y 5 en **otra PC** (con su propio `.env` y el mismo `ca.pem`): debe verse la misma nota.
 
-> Aiven detiene los servicios sin uso: si no conecta, reactivalo desde la consola antes de la defensa.
+> Aiven apaga los servicios Free sin uso: si no conecta, encendelo desde la consola (*Power on*) antes de la defensa.
 
 📸 **Captura 3:** la base en Aiven y el SELECT con la nota creada desde la app (y la pantalla Estado con SSL: sí).
 
@@ -123,8 +137,7 @@ minikube start
 kubectl create configmap coliseum-sql --from-file=sql/
 kubectl create secret generic coliseum-secret \
   --from-literal=DB_USER=coliseum \
-  --from-literal=DB_PASSWORD='<contraseña>' \
-  --from-literal=MYSQL_ROOT_PASSWORD='<contraseña root>'
+  --from-literal=DB_PASSWORD='<contraseña>'
 kubectl apply -f k8s/configmap.yaml -f k8s/db-deployment.yaml -f k8s/db-service.yaml
 kubectl apply -f k8s/app-deployment.yaml -f k8s/app-service.yaml
 kubectl get pods,svc          # esperar a que todo esté Running / READY 1/1
@@ -148,7 +161,7 @@ Qué hay en los manifiestos:
 
 - `configmap.yaml`: configuración no secreta (host, puerto, nombre de la base).
 - `secret.yaml.example`: plantilla del Secret (usuario y contraseñas); el real se crea con `kubectl create secret` y no se versiona.
-- `db-deployment.yaml` / `db-service.yaml`: MySQL con volumen persistente, `requests/limits` y probes `mysqladmin ping`.
+- `db-deployment.yaml` / `db-service.yaml`: PostgreSQL con volumen persistente, `requests/limits` y probes `pg_isready` / `SELECT 1`.
 - `app-deployment.yaml` / `app-service.yaml`: la app en modo servicio, con `readinessProbe` y `livenessProbe` sobre `/health`, `requests/limits`, usuario no root y sin privilegios extra.
 
 📸 **Captura 4:** `kubectl get pods,svc` con todo en Running y `/health` respondiendo OK.
@@ -158,8 +171,8 @@ Qué hay en los manifiestos:
 | Síntoma | Causa y solución |
 |---|---|
 | `Falta la variable de entorno DB_HOST` | No existe `.env` o está vacío. Copiá `.env.example` y completalo. |
-| La app no conecta a Aiven | Servicio apagado (reactivarlo), `DB_SSL_MODE` distinto de `REQUIRED`, o puerto/host mal copiados. |
-| `docker compose up` falla en `db` | `DB_USER` no puede ser `root`; faltan `DB_ROOT_PASSWORD` o `DB_PASSWORD`. Si cambiaste credenciales después de la primera vez: `docker compose down -v`. |
+| La app no conecta a Aiven | Servicio apagado (encenderlo), `DB_SSL_MODE` en `DISABLED` (Aiven exige SSL), `ca.pem` en otra ruta que `DB_SSL_ROOT_CERT`, o puerto/host mal copiados. |
+| `docker compose up` falla en `db` | Faltan `DB_USER`, `DB_PASSWORD` o `DB_NAME` en `.env`. Si cambiaste credenciales después de la primera vez: `docker compose down -v`. |
 | El pod `coliseum-app` queda `ImagePullBackOff` | La imagen no existe o es privada: publicala/hacela pública o usá `minikube image load`. |
 | Pod `coliseum-app` en `0/1` | La base todavía no responde (se espera) o el Secret no existe (`kubectl describe pod`). |
 | Base local creada con una versión vieja del proyecto | Esta versión agrega la columna `usuarios.rol`. Borrá la base vieja y volvé a ejecutar los dos scripts de `sql/`. |
@@ -185,7 +198,7 @@ La consigna pide un despliegue reproducible a partir de la documentación. Esta 
 
 ### Nivel 2
 
-- [ ] Base MySQL en Aiven (plan gratuito, sin tarjeta).
+- [ ] Base PostgreSQL en Aiven (plan gratuito, sin tarjeta).
 - [ ] `01-crear-tablas.sql` y `02-datos-prueba.sql` ejecutados contra Aiven.
 - [ ] Conexión por variables de entorno (host, puerto, base, usuario, contraseña) y SSL (`DB_SSL_MODE=REQUIRED`).
 - [ ] La app (de escritorio) conectada a Aiven; los mismos datos se ven desde dos máquinas distintas.
@@ -196,7 +209,7 @@ La consigna pide un despliegue reproducible a partir de la documentación. Esta 
 - [ ] `minikube` o `kind` funcionando en la máquina del taller.
 - [ ] `Deployment` con imagen, variables de entorno, `requests` y `limits` (app y base); `Service` (app y base).
 - [ ] Credenciales en un `Secret` y configuración (puertos, URLs) en un `ConfigMap`.
-- [ ] `readinessProbe` y `livenessProbe` (sobre `/health` en la app y con `mysqladmin ping` en la base).
+- [ ] `readinessProbe` y `livenessProbe` (sobre `/health` en la app y con `pg_isready` en la base).
 - [ ] Evidencia: `kubectl get pods,svc` con todo en `Running` y la app funcionando en el clúster (captura 4).
 
 ### Seguridad

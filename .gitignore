@@ -19,3 +19,7 @@ Thumbs.db
 .env
 k8s/secret.yaml
 coliseum.log
+
+# Certificado de Aiven (se descarga de la consola; no se sube)
+ca.pem
+*.pem

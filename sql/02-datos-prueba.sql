@@ -2,16 +2,22 @@
 -- Cuentas de prueba (las contraseñas están guardadas como hash, nunca en texto plano):
 --   admin  -> rol ADMIN,   contraseña de demostración indicada en docs/guia-despliegue.md
 --   ana, bruno, carla, diego -> rol USUARIO, misma contraseña de demostración
--- Ejecutar DESPUÉS de 01-crear-tablas.sql. INSERT IGNORE permite repetirlo sin errores.
+-- Ejecutar DESPUÉS de 01-crear-tablas.sql. Se puede repetir sin errores ni duplicados
+-- (ON CONFLICT DO NOTHING y WHERE NOT EXISTS).
 
-INSERT IGNORE INTO usuarios (id, nombre_usuario, contrasena_hash, rol, notificaciones) VALUES
+INSERT INTO usuarios (id, nombre_usuario, contrasena_hash, rol, notificaciones) VALUES
     (1, 'admin', 'pbkdf2$120000$Dqrt44SddVHTtCuPCACuVw==$jg94A75zocZFri+23/bWHNaGNJdR7m8HDhV9mUE+jtk=', 'ADMIN', NULL),
     (2, 'ana',   'pbkdf2$120000$PcyLbpc6zGZaMJetPbNWGQ==$i9zarcpmpxaE3NFmbDsehmeD1pFJPoXk6iMmo6SRyRA=', 'USUARIO', NULL),
     (3, 'bruno', 'pbkdf2$120000$PcyLbpc6zGZaMJetPbNWGQ==$i9zarcpmpxaE3NFmbDsehmeD1pFJPoXk6iMmo6SRyRA=', 'USUARIO', NULL),
     (4, 'carla', 'pbkdf2$120000$PcyLbpc6zGZaMJetPbNWGQ==$i9zarcpmpxaE3NFmbDsehmeD1pFJPoXk6iMmo6SRyRA=', 'USUARIO', NULL),
-    (5, 'diego', 'pbkdf2$120000$PcyLbpc6zGZaMJetPbNWGQ==$i9zarcpmpxaE3NFmbDsehmeD1pFJPoXk6iMmo6SRyRA=', 'USUARIO', NULL);
+    (5, 'diego', 'pbkdf2$120000$PcyLbpc6zGZaMJetPbNWGQ==$i9zarcpmpxaE3NFmbDsehmeD1pFJPoXk6iMmo6SRyRA=', 'USUARIO', NULL)
+ON CONFLICT DO NOTHING;
 
-INSERT IGNORE INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios, hora) VALUES
+-- Como los id se insertaron a mano, se adelanta el contador para que el próximo usuario
+-- registrado desde la app reciba el id 6 (y no choque con el 1).
+SELECT setval(pg_get_serial_sequence('usuarios', 'id'), (SELECT MAX(id) FROM usuarios));
+
+INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios, hora) VALUES
     (2, 'MONDAY', 'Pecho y tríceps', '', '18:00:00'),
     (2, 'TUESDAY', 'Piernas', '', '18:00:00'),
     (2, 'WEDNESDAY', 'Descanso', '', NULL),
@@ -32,9 +38,12 @@ INSERT IGNORE INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios, 
     (4, 'THURSDAY', 'Fuerza inferior', '', '07:00:00'),
     (4, 'FRIDAY', 'Cardio', '', '07:00:00'),
     (4, 'SATURDAY', 'Descanso', '', NULL),
-    (4, 'SUNDAY', 'Descanso', '', NULL);
+    (4, 'SUNDAY', 'Descanso', '', NULL)
+ON CONFLICT DO NOTHING;
 
-INSERT IGNORE INTO rutinas_dia (usuario_id, fecha, descripcion) VALUES
+-- rutinas_dia no tiene una clave única por texto: WHERE NOT EXISTS evita duplicar si se repite el script.
+INSERT INTO rutinas_dia (usuario_id, fecha, descripcion)
+SELECT v.usuario_id, v.fecha::date, v.descripcion FROM (VALUES
     (2, '2026-11-16', 'Press banca 4x8 y fondos'),
     (2, '2026-11-17', 'Sentadilla 5x5 y prensa'),
     (2, '2026-11-19', 'Dominadas y remo con barra'),
@@ -54,9 +63,13 @@ INSERT IGNORE INTO rutinas_dia (usuario_id, fecha, descripcion) VALUES
     (5, '2026-11-18', 'Primera clase de adaptación'),
     (5, '2026-11-25', 'Circuito de cuerpo completo'),
     (5, '2026-12-05', 'Natación 1 km'),
-    (1, '2026-11-17', 'Revisión de rutinas de los usuarios nuevos');
+    (1, '2026-11-17', 'Revisión de rutinas de los usuarios nuevos')
+) AS v (usuario_id, fecha, descripcion)
+WHERE NOT EXISTS (SELECT 1 FROM rutinas_dia r
+                  WHERE r.usuario_id = v.usuario_id AND r.fecha = v.fecha::date AND r.descripcion = v.descripcion);
 
-INSERT IGNORE INTO avisos_entreno (usuario_id, fecha, canal) VALUES
+INSERT INTO avisos_entreno (usuario_id, fecha, canal) VALUES
     (2, '2026-11-16', 'toast'),
     (3, '2026-11-16', 'toast'),
-    (4, '2026-11-16', 'toast');
+    (4, '2026-11-16', 'toast')
+ON CONFLICT DO NOTHING;

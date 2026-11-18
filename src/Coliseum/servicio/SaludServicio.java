@@ -31,11 +31,11 @@ public class SaludServicio {
         }
     }
 
-    /** Pregunta a MySQL si la sesión actual está cifrada (variable de sesión Ssl_cipher). */
+    /** Pregunta a PostgreSQL si la conexión actual está cifrada (vista pg_stat_ssl). */
     private boolean usaSsl(Connection con) {
-        try (PreparedStatement st = con.prepareStatement("SHOW SESSION STATUS LIKE 'Ssl_cipher'");
+        try (PreparedStatement st = con.prepareStatement("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()");
              ResultSet rs = st.executeQuery()) {
-            return rs.next() && rs.getString(2) != null && !rs.getString(2).isEmpty();
+            return rs.next() && rs.getBoolean(1);
         } catch (SQLException e) {
             return false;
         }

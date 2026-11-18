@@ -4,7 +4,7 @@
 
 Coliseum es una aplicación de escritorio desarrollada en Java como proyecto académico (Programación Avanzada, UTU).
 Permite organizar rutinas de entrenamiento: calendario con notas por fecha, rutina semanal, reloj, cronómetro,
-recordatorios con notificaciones y reportes. Los datos se guardan en MySQL (local con Docker o en la nube con Aiven).
+recordatorios con notificaciones y reportes. Los datos se guardan en PostgreSQL (local con Docker o en la nube con Aiven).
 
 ## Funcionalidades
 
@@ -19,8 +19,8 @@ recordatorios con notificaciones y reportes. Los datos se guardan en MySQL (loca
 
 ## Tecnologías utilizadas
 
-Java 11+ (probado con 17 y 21) · Java Swing · JDBC · MySQL 8 · MySQL Connector/J · Docker y docker-compose ·
-GitHub Actions + GitHub Container Registry · Aiven (MySQL en la nube) · Kubernetes (minikube) · Trivy · Dependabot · SonarLint.
+Java 11+ (probado con 17 y 21) · Java Swing · JDBC · PostgreSQL 16 · driver JDBC de PostgreSQL · Docker y docker-compose ·
+GitHub Actions + GitHub Container Registry · Aiven (PostgreSQL en la nube) · Kubernetes (minikube) · Trivy · Dependabot · SonarLint.
 
 ## Cómo ejecutarla (resumen)
 
@@ -84,13 +84,13 @@ Proyecto **de escritorio**: la ventana Swing corre en la PC; en Docker y Kuberne
 | 1 | Credenciales fuera del código, en `.env` | [`config/Configuracion.java`](src/Coliseum/config/Configuracion.java), `.env` | La app lee `DB_*` del entorno |
 | 1 | `.env` en `.gitignore` y `.env.example` sin valores | [`.gitignore`](.gitignore), [`.env.example`](.env.example) | `git check-ignore .env` |
 | 1 | Imagen en GitHub Container Registry | [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) | Pestaña *Packages* de GitHub |
-| 2 | MySQL en Aiven | [`docs/guia-despliegue.md`](docs/guia-despliegue.md), Nivel 2 | Consola de Aiven |
-| 2 | Scripts de creación y carga contra la nube | [`sql/01-crear-tablas.sql`](sql/01-crear-tablas.sql), [`sql/02-datos-prueba.sql`](sql/02-datos-prueba.sql) | `mysql ... --ssl-mode=REQUIRED < sql/...` |
+| 2 | PostgreSQL en Aiven | [`docs/guia-despliegue.md`](docs/guia-despliegue.md), Nivel 2 | Consola de Aiven |
+| 2 | Scripts de creación y carga contra la nube | [`sql/01-crear-tablas.sql`](sql/01-crear-tablas.sql), [`sql/02-datos-prueba.sql`](sql/02-datos-prueba.sql) | SQL editor de Aiven o `psql "... sslmode=verify-full" -f sql/...` |
 | 2 | Conexión por variables de entorno y SSL | [`config/Conexion.java`](src/Coliseum/config/Conexion.java) (`DB_SSL_MODE`) | Pantalla *Estado*: "conexión cifrada (SSL): sí" |
 | 2 | Desktop: app conectada a Aiven, mismos datos desde dos máquinas | `Coliseum Launcher.bat` con `.env` apuntando a Aiven | Nota creada en una PC y vista en otra; `SELECT` directo sobre Aiven |
 | 3 | `Deployment` (imagen, variables, `requests`/`limits`) y `Service` para app y base | [`k8s/app-deployment.yaml`](k8s/app-deployment.yaml), [`k8s/app-service.yaml`](k8s/app-service.yaml), [`k8s/db-deployment.yaml`](k8s/db-deployment.yaml), [`k8s/db-service.yaml`](k8s/db-service.yaml) | `kubectl get pods,svc` |
 | 3 | Credenciales en `Secret`, configuración en `ConfigMap` | [`k8s/secret.yaml.example`](k8s/secret.yaml.example), [`k8s/configmap.yaml`](k8s/configmap.yaml) | `kubectl describe pod` |
-| 3 | `livenessProbe` y `readinessProbe` | `/health` en la app; `mysqladmin ping` en el contenedor de la base | `kubectl get pods` con `READY 1/1` |
+| 3 | `livenessProbe` y `readinessProbe` | `/health` en la app; `pg_isready` en el contenedor de la base | `kubectl get pods` con `READY 1/1` |
 
 Análisis de seguridad (SCA, SAST y escaneo de imagen): [`docs/informe-seguridad.md`](docs/informe-seguridad.md).
 Lista de control de entrega y defensa: [`docs/guia-despliegue.md`](docs/guia-despliegue.md#reproducibilidad-y-lista-de-control).

@@ -17,7 +17,7 @@ RUN groupadd --system --gid 10001 coliseum \
  && mkdir -p /app/classes /app/lib /app/logs \
  && chown -R 10001:10001 /app/logs
 COPY --from=build /out /app/classes
-COPY src/Coliseum/lib/mysql-connector-j-26.7.0.jar /app/lib/
+COPY src/Coliseum/lib/*.jar /app/lib/
 WORKDIR /app/logs
 USER 10001:10001
 ENV JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Djava.awt.headless=true"

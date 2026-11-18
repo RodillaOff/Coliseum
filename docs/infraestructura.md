@@ -1,6 +1,6 @@
 # Infraestructura - Coliseum
 
-Coliseum es una aplicación **de escritorio**. La ventana Swing corre en la PC del usuario y se conecta a MySQL. Para Docker y Kubernetes se usa el **modo servicio** (`consola.ConsolaMain --servicio`), sin ventana, que verifica la base y expone `GET /health`.
+Coliseum es una aplicación **de escritorio**. La ventana Swing corre en la PC del usuario y se conecta a PostgreSQL. Para Docker y Kubernetes se usa el **modo servicio** (`consola.ConsolaMain --servicio`), sin ventana, que verifica la base y expone `GET /health`.
 
 ## Diagrama por entorno
 
@@ -10,13 +10,13 @@ flowchart TB
         APP["Coliseum (Swing)<br/>capas: presentación, servicio, DAO"]
         REC["Recordatorios<br/>hilo de fondo cada 30 s"]
         BAN["Bandeja del sistema y toast de Windows"]
-        JDBC["Driver JDBC<br/>mysql-connector-j"]
+        JDBC["Driver JDBC<br/>driver JDBC PostgreSQL"]
         ENV[".env<br/>(fuera de Git)"]
     end
 
     subgraph DOCKER["Docker / docker compose"]
         CAPP["Contenedor app<br/>modo servicio :8080/health"]
-        CDB[("MySQL 8 local<br/>volumen coliseum-datos")]
+        CDB[("PostgreSQL 16 local<br/>volumen coliseum-datos")]
     end
 
     subgraph K8S["Kubernetes (minikube / kind)"]
@@ -26,7 +26,7 @@ flowchart TB
         SE["Secret"]
     end
 
-    AIVEN[("Aiven<br/>MySQL en la nube (SSL)")]
+    AIVEN[("Aiven<br/>PostgreSQL en la nube (SSL)")]
     GH["GitHub<br/>repositorio + Actions"]
     GHCR["ghcr.io<br/>imagen coliseum"]
 
@@ -49,7 +49,7 @@ flowchart TB
 | Entorno | Qué corre | Base de datos | Cómo se configura |
 |---|---|---|---|
 | PC (Nivel 2) | Ventana Swing (`Coliseum Launcher.bat`) | Aiven, con SSL | `.env` local |
-| Docker (Nivel 1) | Contenedor `app` en modo servicio | Contenedor `db` (MySQL 8) | `.env` leído por `docker-compose.yml` |
+| Docker (Nivel 1) | Contenedor `app` en modo servicio | Contenedor `db` (PostgreSQL 16) | `.env` leído por `docker-compose.yml` |
 | Kubernetes (Nivel 3) | Pod `coliseum-app` | Pod `coliseum-db` con PVC | `ConfigMap` + `Secret` |
 
 ## Modelo de datos
@@ -101,10 +101,9 @@ Todas las claves foráneas usan `ON DELETE CASCADE`: al borrar un usuario se bor
 
 | Variable | Uso |
 |---|---|
-| `DB_HOST`, `DB_PORT`, `DB_NAME` | Dónde está la base (por defecto el puerto es 3306) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Dónde está la base (por defecto el puerto es 5432) |
 | `DB_USER`, `DB_PASSWORD` | Credenciales. No tienen valor por defecto |
 | `DB_SSL_MODE` | `REQUIRED` (por defecto, Aiven) o `DISABLED` (solo la base local de Docker) |
-| `DB_ROOT_PASSWORD` | Solo `docker compose` (root de MySQL en el contenedor) |
 | `APP_PORT` | Puerto de `/health` (8080 por defecto) |
 
 El archivo `.env` está en `.gitignore`; `.env.example` lista los nombres sin valores.
@@ -113,7 +112,7 @@ El archivo `.env` está en `.gitignore`; `.env.example` lista los nombres sin va
 
 1. Java (JDK 11 o superior) para la ventana de escritorio.
 2. Docker Desktop (`docker compose`), `kubectl` y `minikube` o `kind` para los niveles 1 y 3.
-3. Una base MySQL: la del contenedor (`docker compose up`) o la de Aiven.
+3. Una base PostgreSQL: la del contenedor (`docker compose up`) o la de Aiven.
 4. `.env` completado a partir de `.env.example`.
 5. Para las notificaciones de escritorio: Windows con PowerShell y las notificaciones activadas (Configuración > Sistema > Notificaciones).
 6. Opcional: `coliseum.properties` junto al programa para ajustar los avisos.

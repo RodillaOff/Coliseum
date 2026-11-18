@@ -6,7 +6,6 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -21,7 +20,7 @@ public class RutinaDiaDAOJdbc implements RutinaDiaDAO {
     @Override
     public int agregar(Connection con, int usuarioId, LocalDate fecha, String descripcion) throws SQLException {
         String sql = "INSERT INTO rutinas_dia (usuario_id, fecha, descripcion) VALUES (?, ?, ?)";
-        try (PreparedStatement st = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement st = con.prepareStatement(sql, new String[] {"id"})) {
             st.setInt(1, usuarioId);
             st.setDate(2, Date.valueOf(fecha));
             st.setString(3, descripcion);
@@ -68,7 +67,9 @@ public class RutinaDiaDAOJdbc implements RutinaDiaDAO {
     @Override
     public boolean actualizarPorTexto(Connection con, int usuarioId, LocalDate fecha, String textoActual,
                                       String textoNuevo) throws SQLException {
-        String sql = "UPDATE rutinas_dia SET descripcion = ? WHERE usuario_id = ? AND fecha = ? AND descripcion = ? LIMIT 1";
+        // PostgreSQL no admite LIMIT en UPDATE: se elige UNA fila (la más vieja) con una subconsulta.
+        String sql = "UPDATE rutinas_dia SET descripcion = ? WHERE id = ("
+                + "SELECT id FROM rutinas_dia WHERE usuario_id = ? AND fecha = ? AND descripcion = ? ORDER BY id LIMIT 1)";
         try (PreparedStatement st = con.prepareStatement(sql)) {
             st.setString(1, textoNuevo);
             st.setInt(2, usuarioId);
@@ -81,7 +82,8 @@ public class RutinaDiaDAOJdbc implements RutinaDiaDAO {
     @Override
     public boolean eliminarPorTexto(Connection con, int usuarioId, LocalDate fecha, String texto)
             throws SQLException {
-        String sql = "DELETE FROM rutinas_dia WHERE usuario_id = ? AND fecha = ? AND descripcion = ? LIMIT 1";
+        String sql = "DELETE FROM rutinas_dia WHERE id = ("
+                + "SELECT id FROM rutinas_dia WHERE usuario_id = ? AND fecha = ? AND descripcion = ? ORDER BY id LIMIT 1)";
         try (PreparedStatement st = con.prepareStatement(sql)) {
             st.setInt(1, usuarioId);
             st.setDate(2, Date.valueOf(fecha));

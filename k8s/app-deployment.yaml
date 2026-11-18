@@ -29,7 +29,7 @@ spec:
             - configMapRef:
                 name: coliseum-config     # DB_HOST, DB_PORT, DB_NAME, DB_SSL_MODE, APP_PORT
             - secretRef:
-                name: coliseum-secret     # DB_USER, DB_PASSWORD (y MYSQL_ROOT_PASSWORD, que la app no usa)
+                name: coliseum-secret     # DB_USER y DB_PASSWORD
           resources:
             requests: {cpu: "100m", memory: "192Mi"}
             limits: {cpu: "500m", memory: "384Mi"}

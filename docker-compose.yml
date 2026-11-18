@@ -1,23 +1,22 @@
-# Levanta la aplicación (modo servicio) y una base MySQL local con un solo comando:
+# Levanta la aplicación (modo servicio) y una base PostgreSQL local con un solo comando:
 #   cp .env.example .env   (completar valores)   ->   docker compose up --build
 # Las tablas y los datos de prueba se cargan solos desde ./sql la primera vez que arranca la base.
 services:
   db:
-    image: mysql:8.0
+    image: postgres:16-alpine
     container_name: coliseum-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}          # no puede ser "root"
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}       # dueño de la base (no hace falta otro usuario "root")
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "3307:3306"                   # para hacer SELECT directos desde tu PC (host 3307)
+      - "5433:5432"                   # para hacer SELECT directos desde tu PC (host 5433)
     volumes:
-      - coliseum-datos:/var/lib/mysql
+      - coliseum-datos:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d:ro   # 01-crear-tablas.sql y 02-datos-prueba.sql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -33,7 +32,7 @@ services:
         condition: service_healthy
     environment:
       DB_HOST: db                     # nombre del servicio de arriba
-      DB_PORT: "3306"
+      DB_PORT: "5432"
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}

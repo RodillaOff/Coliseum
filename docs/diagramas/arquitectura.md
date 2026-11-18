@@ -9,7 +9,7 @@ flowchart LR
     end
     subgraph Local["Docker / docker-compose"]
         APP["Contenedor app<br/>modo servicio :8080/health"]
-        DBL[("MySQL 8 local")]
+        DBL[("PostgreSQL 16 local")]
     end
     subgraph K8S["Kubernetes local (minikube)"]
         PODA["Pod coliseum-app<br/>Deployment + Service"]
@@ -17,7 +17,7 @@ flowchart LR
         CM["ConfigMap"]
         SEC["Secret"]
     end
-    AIVEN[("Aiven<br/>MySQL en la nube (SSL)")]
+    AIVEN[("Aiven<br/>PostgreSQL en la nube (SSL)")]
     GH["Repositorio GitHub<br/>código, Dockerfile, workflows"]
     GHCR["ghcr.io<br/>imagen coliseum"]
 
@@ -41,7 +41,7 @@ flowchart TB
     D["Interfaces DAO<br/>UsuarioDAO · RutinaSemanalDAO · RutinaDiaDAO · AvisoDAO · ReporteDAO"]
     J["Implementación JDBC<br/>dao/jdbc (PreparedStatement)"]
     C["config<br/>Configuracion (variables de entorno) · Conexion"]
-    DB[("MySQL")]
+    DB[("PostgreSQL")]
     P --> S --> D --> J --> DB
     S --> C
     J -.usa la conexión.-> C

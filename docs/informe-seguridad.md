@@ -24,7 +24,7 @@ Límites conocidos (para explicar en la defensa): no hay bloqueo por intentos fa
 
 ## 2. SCA: dependencias (Dependabot / Trivy)
 
-- La única dependencia Java es `mysql-connector-j` (JAR en `src/Coliseum/lib/`). Dependabot no lee JARs sueltos, por eso `.github/dependabot.yml` vigila las **imágenes base de Docker** y las **GitHub Actions**; y Trivy (sección 4) analiza el JAR dentro de la imagen.
+- La única dependencia Java es el driver JDBC de PostgreSQL (`postgresql-42.7.2.jar` en `src/Coliseum/lib/`). Dependabot no lee JARs sueltos, por eso `.github/dependabot.yml` vigila las **imágenes base de Docker** y las **GitHub Actions**; y Trivy (sección 4) analiza el JAR dentro de la imagen.
 - Ejecución local del escaneo del repositorio:
 
 ```bash

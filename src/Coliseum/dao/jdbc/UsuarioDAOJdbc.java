@@ -5,7 +5,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +19,7 @@ public class UsuarioDAOJdbc implements UsuarioDAO {
     @Override
     public int crear(Connection con, Usuario u) throws SQLException {
         String sql = "INSERT INTO usuarios (nombre_usuario, contrasena_hash, rol) VALUES (?, ?, ?)";
-        try (PreparedStatement st = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement st = con.prepareStatement(sql, new String[] {"id"})) {
             st.setString(1, u.getNombre());
             st.setString(2, u.getHashContrasena());
             st.setString(3, u.getRol().name());

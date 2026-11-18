@@ -1,4 +1,4 @@
-# Base de datos MySQL dentro del clúster (para el taller). Datos en un volumen persistente.
+# Base de datos PostgreSQL dentro del clúster (para el taller). Datos en un volumen persistente.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -18,7 +18,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate            # un solo MySQL escribiendo en el volumen
+    type: Recreate            # un solo PostgreSQL escribiendo en el volumen
   selector:
     matchLabels:
       app: coliseum-db
@@ -28,42 +28,41 @@ spec:
         app: coliseum-db
     spec:
       containers:
-        - name: mysql
-          image: mysql:8.0
+        - name: postgres
+          image: postgres:16-alpine
           ports:
-            - containerPort: 3306
+            - containerPort: 5432
           env:
-            - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef: {name: coliseum-secret, key: MYSQL_ROOT_PASSWORD}
-            - name: MYSQL_USER
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef: {name: coliseum-secret, key: DB_USER}
-            - name: MYSQL_PASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef: {name: coliseum-secret, key: DB_PASSWORD}
-            - name: MYSQL_DATABASE
+            - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef: {name: coliseum-config, key: DB_NAME}
+            - name: PGDATA                       # subcarpeta: el volumen puede traer "lost+found"
+              value: /var/lib/postgresql/data/pgdata
           resources:
-            requests: {cpu: "100m", memory: "512Mi"}
-            limits: {cpu: "500m", memory: "1Gi"}
-          readinessProbe:
+            requests: {cpu: "100m", memory: "256Mi"}
+            limits: {cpu: "500m", memory: "512Mi"}
+          readinessProbe:           # ¿acepta consultas? recién ahí recibe tráfico
             exec:
-              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]
-            initialDelaySeconds: 20
+              command: ["sh", "-c", "psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -c 'SELECT 1' > /dev/null"]
+            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
-          livenessProbe:
+          livenessProbe:            # ¿el proceso responde? si no, se reinicia el contenedor
             exec:
-              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
             initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 6
           volumeMounts:
             - name: datos
-              mountPath: /var/lib/mysql
+              mountPath: /var/lib/postgresql/data
             - name: sql-inicial
               mountPath: /docker-entrypoint-initdb.d   # se ejecuta solo la primera vez (volumen vacío)
               readOnly: true

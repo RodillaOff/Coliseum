@@ -9,7 +9,6 @@ import excepciones.ColiseumException;
 import excepciones.ValidacionException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 import java.util.Optional;
 import modelo.Rol;
@@ -39,9 +38,10 @@ public class UsuarioServicio {
             }
             dao.crear(con, Usuario.crear(Rol.USUARIO, 0, n, Hashes.actual().hashear(contrasena), null));
             return true;
-        } catch (SQLIntegrityConstraintViolationException e) {
-            return false; // otro registro simultáneo se quedó con el nombre
         } catch (SQLException e) {
+            if (esNombreRepetido(e)) {
+                return false; // otro registro simultáneo se quedó con el nombre
+            }
             throw AccesoDatosException.de("Registrar usuario", e);
         }
     }
@@ -105,9 +105,10 @@ public class UsuarioServicio {
                 throw new ValidacionException("Ese nombre de usuario ya existe.");
             }
             dao.actualizarNombre(con, id, n);
-        } catch (SQLIntegrityConstraintViolationException e) {
-            throw new ValidacionException("Ese nombre de usuario ya existe.");
         } catch (SQLException e) {
+            if (esNombreRepetido(e)) {
+                throw new ValidacionException("Ese nombre de usuario ya existe.");
+            }
             throw AccesoDatosException.de("Renombrar usuario", e);
         }
     }
@@ -207,5 +208,10 @@ public class UsuarioServicio {
         if (u.getRol() == Rol.ADMIN && dao.contarPorRol(con, Rol.ADMIN) <= 1) {
             throw new ValidacionException("No se puede dejar el sistema sin ningún administrador.");
         }
+    }
+
+    /** SQLSTATE 23505 = se violó una clave única (en este caso, nombre_usuario repetido). */
+    private static boolean esNombreRepetido(SQLException e) {
+        return "23505".equals(e.getSQLState());
     }
 }

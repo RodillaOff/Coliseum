@@ -13,7 +13,7 @@ final class Conexiones {
         try {
             con.rollback();
         } catch (SQLException ignorada) {
-            // si el rollback falla, la conexión se cierra igual y MySQL descarta la transacción
+            // si el rollback falla, la conexión se cierra igual y la base descarta la transacción
         }
     }
 

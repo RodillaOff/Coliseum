@@ -19,7 +19,8 @@ public class RutinaSemanalDAOJdbc implements RutinaSemanalDAO {
     public void guardarDia(Connection con, int usuarioId, DayOfWeek dia, String resumen, String horaSql)
             throws SQLException {
         String sql = "INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios, hora) "
-                + "VALUES (?, ?, ?, '', ?) ON DUPLICATE KEY UPDATE resumen = VALUES(resumen), hora = VALUES(hora)";
+                + "VALUES (?, ?, ?, '', CAST(? AS TIME)) "
+                + "ON CONFLICT (usuario_id, dia_semana) DO UPDATE SET resumen = EXCLUDED.resumen, hora = EXCLUDED.hora";
         try (PreparedStatement st = con.prepareStatement(sql)) {
             st.setInt(1, usuarioId);
             st.setString(2, dia.name());
@@ -37,7 +38,8 @@ public class RutinaSemanalDAOJdbc implements RutinaSemanalDAO {
     public void guardarEjercicios(Connection con, int usuarioId, DayOfWeek dia, String ejercicios)
             throws SQLException {
         String sql = "INSERT INTO rutina_semanal (usuario_id, dia_semana, resumen, ejercicios) "
-                + "VALUES (?, ?, '', ?) ON DUPLICATE KEY UPDATE ejercicios = VALUES(ejercicios)";
+                + "VALUES (?, ?, '', ?) "
+                + "ON CONFLICT (usuario_id, dia_semana) DO UPDATE SET ejercicios = EXCLUDED.ejercicios";
         try (PreparedStatement st = con.prepareStatement(sql)) {
             st.setInt(1, usuarioId);
             st.setString(2, dia.name());

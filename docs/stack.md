@@ -12,8 +12,8 @@ Proyecto **de escritorio** (Programación Avanzada, UTU). Todo el stack usa serv
 
 ## Datos
 
-- **Base de datos:** MySQL 8 (contenedor `mysql:8.0` en local; servicio MySQL gratuito de **Aiven** en la nube).
-- **Acceso:** JDBC con **MySQL Connector/J** (`lib/mysql-connector-j-26.7.0.jar`). Todas las consultas usan `PreparedStatement` (R9).
+- **Base de datos:** PostgreSQL 16 (contenedor `postgres:16-alpine` en local; servicio PostgreSQL gratuito de **Aiven** en la nube). Se cambió desde MySQL porque Aiven dejó de ofrecer MySQL gratis el 6/11/2026.
+- **Acceso:** JDBC con el **driver de PostgreSQL** (`lib/postgresql-42.7.2.jar`). Todas las consultas usan `PreparedStatement` (R9).
 - **Esquema y datos:** `sql/01-crear-tablas.sql` y `sql/02-datos-prueba.sql` (R11). La aplicación **no** crea ni altera tablas.
 
 ## Seguridad
@@ -27,11 +27,11 @@ Proyecto **de escritorio** (Programación Avanzada, UTU). Todo el stack usa serv
 ## Contenedores y nube
 
 - **Docker:** `Dockerfile` en dos etapas (JDK para compilar, JRE para ejecutar, usuario no root UID 10001).
-- **docker compose:** `docker-compose.yml` con la app y MySQL; levanta todo con `docker compose up`.
+- **docker compose:** `docker-compose.yml` con la app y PostgreSQL; levanta todo con `docker compose up`.
 - **Registro de imágenes:** GitHub Container Registry (`ghcr.io`), publicada con GitHub Actions (`.github/workflows/docker-publish.yml`).
-- **Nube:** Aiven (MySQL). Render no aplica porque el proyecto es de escritorio.
+- **Nube:** Aiven (PostgreSQL). Render no aplica porque el proyecto es de escritorio.
 - **Orquestación:** Kubernetes local con minikube (o kind): `Deployment`, `Service`, `ConfigMap`, `Secret`, `PersistentVolumeClaim`, `requests/limits`, `readinessProbe` y `livenessProbe` (`k8s/`).
 
 ## Herramientas de desarrollo
 
-Git y GitHub, IntelliJ IDEA / VS Code, SonarLint, MySQL Workbench o cliente `mysql` para los SELECT de comprobación, Mermaid para los diagramas.
+Git y GitHub, IntelliJ IDEA / VS Code, SonarLint, el SQL editor de Aiven, pgAdmin/DBeaver o `psql` para los SELECT de comprobación, Mermaid para los diagramas.

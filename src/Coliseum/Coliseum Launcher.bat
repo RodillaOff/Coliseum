@@ -7,7 +7,7 @@ if not exist ".env" if not exist "..\..\.env" (
     exit /b
 )
 echo Compilando Coliseum...
-javac -encoding UTF-8 -cp ".;lib\mysql-connector-j-26.7.0.jar" Coliseum.java
+javac -encoding UTF-8 -cp ".;lib\*" Coliseum.java
 if %errorlevel% neq 0 (
     echo.
     echo Hubo un error al compilar. Revisa el mensaje de arriba.
@@ -16,4 +16,4 @@ if %errorlevel% neq 0 (
 )
 echo Listo. Abriendo Coliseum...
 rem "start ... javaw" abre la app sin depender de esta ventana: se puede cerrar y la app sigue en segundo plano.
-start "" javaw -cp ".;lib\mysql-connector-j-26.7.0.jar" Coliseum
+start "" javaw -cp ".;lib\*" Coliseum

@@ -2163,7 +2163,7 @@ class Recordatorios {
 
     /** Marca "ya avisé" en la base. Devuelve true solo la primera vez del día para ese canal. */
     private static boolean reclamar(int usuarioId, LocalDate fecha, String canal) {
-        String sql = "INSERT IGNORE INTO avisos_entreno (usuario_id, fecha, canal) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO avisos_entreno (usuario_id, fecha, canal) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
         try (Connection con = ConexionBD.obtenerConexion();
              PreparedStatement stmt = con.prepareStatement(sql)) {
             stmt.setInt(1, usuarioId);

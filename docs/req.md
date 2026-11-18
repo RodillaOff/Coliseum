@@ -66,7 +66,7 @@
 ### 3. Mantenibilidad y arquitectura
 - **RNF-05 (Liberación de recursos):** el acceso a datos debe usar `try-with-resources` para cerrar conexiones, consultas y `ResultSet`.
 - **RNF-06 (Plataforma):** la aplicación debe ejecutarse en cualquier entorno Java 11 o superior con soporte para Swing.
-- **RNF-07 (Base de datos):** la aplicación requiere un servidor MySQL 8 accesible según `DB_HOST`, `DB_PORT` y `DB_NAME`: el contenedor de `docker compose` (`DB_SSL_MODE=DISABLED`) o Aiven en la nube (`DB_SSL_MODE=REQUIRED`).
+- **RNF-07 (Base de datos):** la aplicación requiere un servidor PostgreSQL 16 o superior accesible según `DB_HOST`, `DB_PORT` y `DB_NAME`: el contenedor de `docker compose` (`DB_SSL_MODE=DISABLED`) o Aiven en la nube (`DB_SSL_MODE=REQUIRED`).
 
 ### 4. Notificaciones y segundo plano
 - **RNF-08 (Esquema versionado):** el esquema se crea con `sql/01-crear-tablas.sql` (idempotente: `CREATE TABLE IF NOT EXISTS`) y los datos de prueba con `sql/02-datos-prueba.sql` (más de 20 registros, `INSERT IGNORE`). La aplicación no crea ni altera tablas, así que no necesita permisos de administrador.
@@ -82,7 +82,7 @@
 ### 5. Despliegue y operación
 - **RNF-17 (Arquitectura en capas):** presentación (Swing y `ConsolaMain`) → servicio → interfaces `dao/*DAO` → implementaciones `dao/jdbc/*DAOJdbc`, con el modelo en `modelo/`. Las capas se comunican mediante interfaces.
 - **RNF-18 (Contenerización):** la app y la base deben correr en contenedores con `docker compose up`, con la imagen publicada en GitHub Container Registry y un usuario no root dentro del contenedor.
-- **RNF-19 (Nube):** la aplicación debe funcionar contra una base MySQL en Aiven con SSL, con los mismos datos visibles desde dos PC distintas.
+- **RNF-19 (Nube):** la aplicación debe funcionar contra una base PostgreSQL en Aiven con SSL, con los mismos datos visibles desde dos PC distintas.
 - **RNF-20 (Orquestación):** la app y la base deben poder desplegarse en Kubernetes (minikube o kind) con `Deployment`, `Service`, `ConfigMap`, `Secret`, `requests/limits` y probes.
 - **RNF-21 (Costo cero):** todo el despliegue usa servicios gratuitos y no pide tarjeta de crédito.
 - **RNF-22 (Reproducibilidad):** otra persona debe poder repetir el despliegue siguiendo solo `README.md` y `docs/guia-despliegue.md`.
