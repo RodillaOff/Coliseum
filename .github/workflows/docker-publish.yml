@@ -35,7 +35,7 @@ jobs:
           tags: coliseum-local:scan
 
       - name: Escaneo de la imagen con Trivy (hallazgos HIGH y CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: coliseum-local:scan
           severity: HIGH,CRITICAL
