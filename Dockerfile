@@ -2,7 +2,7 @@
 # Construcción en dos etapas: se compila con el JDK y se ejecuta con un JRE mínimo y usuario sin privilegios.
 
 # ---------- Etapa 1: compilar ----------
-FROM eclipse-temurin:17-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /build
 COPY src/Coliseum/ ./
 RUN mkdir /out \
@@ -10,7 +10,7 @@ RUN mkdir /out \
       $(find config excepciones modelo seguridad dao servicio consola -name '*.java')
 
 # ---------- Etapa 2: ejecutar ----------
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:25-jre
 # Usuario distinto de root (hardening). UID numérico para que Kubernetes pueda verificarlo (runAsNonRoot).
 RUN groupadd --system --gid 10001 coliseum \
  && useradd --system --uid 10001 --gid coliseum --no-create-home --shell /usr/sbin/nologin coliseum \
